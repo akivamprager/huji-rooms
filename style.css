@@ -308,3 +308,11 @@ button.book-btn { cursor: pointer; font: inherit; font-weight: 600; font-size: .
   padding: 5px 14px; border-radius: 999px; cursor: pointer; opacity: .8;
 }
 .campus-switch button[aria-pressed="true"] { background: #fff; color: #1e2a6e; opacity: 1; }
+
+/* contact */
+.contact { margin-top: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .88rem; }
+.contact-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; font-weight: 600;
+  text-decoration: none; color: var(--accent); background: var(--accent-soft); border: 1px solid var(--line);
+}
+.contact-btn:hover { border-color: var(--accent); }

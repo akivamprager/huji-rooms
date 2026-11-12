@@ -12,6 +12,10 @@ const LS_CAMPUS = 'huji-rooms.campus';
 const lastRoomKey = () => `huji-rooms.last.${state.campus}`; // the last room, per campus
 const LS_FAV = 'huji-rooms.favorites';
 const BOOKING = 'https://www.huji.ac.il/rooms/';
+// "צור קשר": a form (Google Forms / Tally), so messages arrive without showing anyone an address.
+// Empty = the link stays hidden.
+const CONTACT_FORM = 'https://docs.google.com/forms/d/e/1FAIpQLSchCA9tD2capWf10X-nAW05BVB-gEcp38jZKWVyAjsOWud-AA/viewform';
+if (CONTACT_FORM) { $('contact-link').href = CONTACT_FORM; $('contact').hidden = false; }
 const LTR = (s) => `⁦${s}⁩`;
 
 let db;
