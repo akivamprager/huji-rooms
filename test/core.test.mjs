@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { decode, statusAt, freeRooms, searchRooms, dayOf, weekday, eventsOn } from '../core.js';
-import { buildRooms, chunkIds, dayNum } from '../tools/rooms.mjs';
+import { buildRooms, chunkIds, dayNum, fixUndefinedBuildings } from '../tools/rooms.mjs';
 
 const room = (id, name, campus = '1', b = '10') => ({ id, name: { he: name }, building: { code: b, name: { he: 'פלדמן' }, campus: { code: campus } } });
 const A = room(1, 'פלדמן א');
@@ -63,4 +63,14 @@ test('search, days, chunking', () => {
   assert.equal(weekday(d11), 0); // 11.10.2026 is a Sunday
   assert.equal(dayOf(new Date(2026, 9, 11, 23, 30)), d11);
   for (const c of chunkIds(Array.from({ length: 100 }, (_, i) => 500000 + i))) assert.ok(c.join(',').length <= 200);
+});
+
+test('rooms under "לא מוגדר" move to the building in their name, else to "אחר"', () => {
+  const d = fixUndefinedBuildings({
+    buildings: { 5: 'ברגמן', 9: 'דנציגר א', 99: 'לא מוגדר' },
+    rooms: { 1: ['בנין ברגמן', '99'], 2: ['דנציגר א 10', '99'], 3: ['חדר 7', '99'], 4: ['ברגמן 2', '5'] },
+  });
+  assert.deepEqual(Object.fromEntries(Object.entries(d.rooms).map(([k, v]) => [k, v[1]])), { 1: '5', 2: '9', 3: 'other', 4: '5' });
+  assert.equal(d.buildings[99], undefined);
+  assert.equal(d.buildings.other, 'אחר');
 });

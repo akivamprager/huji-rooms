@@ -92,7 +92,30 @@ export function buildRooms(courses, groupsByCourse, { year, campus = CAMPUS } = 
     (s[e.room] ||= []).push([...e.row, days[0], ...days.slice(1).map((d, i) => d - days[i])]);
   }
   for (const list of Object.values(s)) list.sort((a, b) => a[5] - b[5] || a[3] - b[3]);
-  return { data: { v: 1, year, campus: campus.name, types, buildings, courses: names, rooms, s }, stats };
+  return { data: fixUndefinedBuildings({ v: 1, year, campus: campus.name, types, buildings, courses: names, rooms, s }), stats };
+}
+
+// The Shnaton files some rooms under a building called "לא מוגדר" (undefined). Move each to the real
+// building named in the room's name ("בנין ברגמן" → ברגמן), else to "אחר" (other).
+const UNDEFINED = /^(לא מוגדר|undefined)?$/i;
+const bare = (s) => s.replace(/ב[י]?נין|ב[י]?ניין|אולם|["'״׳]/g, '').replace(/\s+/g, ' ').trim();
+export function fixUndefinedBuildings(data) {
+  const bad = Object.keys(data.buildings).filter((c) => UNDEFINED.test(data.buildings[c].trim()));
+  if (!bad.length) return data;
+  const real = Object.entries(data.buildings).filter(([c]) => !bad.includes(c))
+    .sort((a, b) => b[1].length - a[1].length); // longest name first ("דנציגר א" before "דנציגר")
+  let other = null;
+  for (const room of Object.values(data.rooms)) {
+    if (!bad.includes(room[1])) continue;
+    const hit = real.find(([, name]) => bare(room[0]).includes(bare(name)));
+    if (hit) room[1] = hit[0];
+    else {
+      other ||= (data.buildings.other = 'אחר', 'other');
+      room[1] = other;
+    }
+  }
+  for (const c of bad) delete data.buildings[c];
+  return data;
 }
 
 async function getJson(url, opts = {}, tries = 4) {
