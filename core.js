@@ -137,7 +137,16 @@ export function decodePaths(p) {
 // listed for it (within 70 m, see tools/paths.mjs); off-path metres cost OFF_PATH_COST times more.
 const OFF_PATH = 80;
 const OFF_PATH_COST = 1.2;
-export function walkingDistances(g, here, { maxSnap = 400 } = {}) {
+export function walkingDistances(g, here, opts = {}) {
+  const tree = walkingTree(g, here, opts);
+  return tree && tree.toBuildings;
+}
+
+// The full shortest-path tree from `here`: { dist, prev (previous node, -1 = start), toBuildings,
+// entry: { buildingCode: node the route enters the building from, -1 = walk straight there } } —
+// routeTo() reads a route off it. locs ({ code: [lat, lon] }): a building within OFF_PATH metres can
+// also be walked to directly (you're standing in or right next to it; its paths may be far outside).
+export function walkingTree(g, here, { maxSnap = 400, locs = null } = {}) {
   // local flat coordinates in metres around `here`
   const ky = 110540;
   const kx = 111320 * Math.cos((here[0] * Math.PI) / 180);
@@ -159,10 +168,12 @@ export function walkingDistances(g, here, { maxSnap = 400 } = {}) {
   if (!best || best.d > maxSnap) return null;
   // Dijkstra from both ends of that segment
   const dist = new Float64Array(g.lat.length).fill(Infinity);
+  const prev = new Int32Array(g.lat.length).fill(-1);
   const heap = [];
-  const push = (node, d) => {
+  const push = (node, d, from = -1) => {
     if (d >= dist[node]) return;
     dist[node] = d;
+    prev[node] = from;
     heap.push([d, node]);
     for (let i = heap.length - 1; i > 0;) {
       const up = (i - 1) >> 1;
@@ -199,13 +210,27 @@ export function walkingDistances(g, here, { maxSnap = 400 } = {}) {
     const [d, node] = pop();
     if (d > dist[node]) continue;
     const nb = g.adj[node];
-    for (let i = 0; i < nb.length; i += 2) push(nb[i], d + nb[i + 1]);
+    for (let i = 0; i < nb.length; i += 2) push(nb[i], d + nb[i + 1], node);
   }
-  const out = {};
+  const toBuildings = {};
+  const entry = {};
   for (const [code, list] of Object.entries(g.b)) {
     let m = Infinity;
-    for (let i = 0; i < list.length; i += 2) m = Math.min(m, dist[list[i]] + list[i + 1] * OFF_PATH_COST);
-    if (m < Infinity) out[code] = m;
+    for (let i = 0; i < list.length; i += 2) {
+      const v = dist[list[i]] + list[i + 1] * OFF_PATH_COST;
+      if (v < m) { m = v; entry[code] = list[i]; }
+    }
+    const straight = locs?.[code] ? distance(here, locs[code]) : Infinity;
+    if (straight <= OFF_PATH && straight * OFF_PATH_COST < m) { m = straight * OFF_PATH_COST; entry[code] = -1; }
+    if (m < Infinity) toBuildings[code] = m;
   }
-  return out;
+  return { dist, prev, toBuildings, entry };
+}
+
+// The route to a building as [lat, lon] points, from `here` to the building's path entry point.
+export function routeTo(g, tree, here, code) {
+  const pts = [];
+  for (let n = tree.entry[code] ?? -1; n >= 0; n = tree.prev[n]) pts.push([g.lat[n], g.lon[n]]);
+  pts.push(here);
+  return pts.reverse();
 }

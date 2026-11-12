@@ -290,7 +290,8 @@ function locate() {
     async (pos) => {
       const here = [pos.coords.latitude, pos.coords.longitude];
       const g = await loadPaths();
-      state.near = { here, walk: g ? walkingDistances(g, here) : null };
+      const locs = Object.fromEntries(Object.entries(extras).filter(([, v]) => v.loc).map(([k, v]) => [k, v.loc]));
+      state.near = { here, walk: g ? walkingDistances(g, here, { locs }) : null };
       render();
     },
     (err) => {

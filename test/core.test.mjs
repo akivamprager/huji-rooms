@@ -111,3 +111,15 @@ test('walkingDistances follows the paths, not a straight line', () => {
   const near = nearestFree(db, { 10: [31.7766, 35.1979] }, [31.7770, 35.1979], { day: d11, minute: 610, walk: { 10: 300 } });
   assert.equal(near[0].dist, 300);
 });
+
+test('standing in a building whose paths are outside: walk straight in, not out and back', () => {
+  // path runs 60 m east of the building centre; we stand 3 m from the centre
+  const o = [31.77, 35.19];
+  const e60 = 60 / (111320 * Math.cos((o[0] * Math.PI) / 180)) * 1e5;
+  const n100 = 100 / 110540 * 1e5;
+  const g = decodePaths({ origin: o, n: [0, Math.round(e60), Math.round(n100), Math.round(e60)], e: [0, 1], w: [100], b: { 7: [0, 60] } });
+  const here = [o[0] + 3 / 110540, o[1]];
+  assert.ok(walkingDistances(g, here)[7] > 100); // without the building's location: out to the path and back
+  const d = walkingDistances(g, here, { locs: { 7: o } })[7];
+  assert.ok(d < 5, String(d)); // with it: 3 m × 1.2
+});
