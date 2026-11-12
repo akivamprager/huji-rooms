@@ -1,6 +1,6 @@
 // Offline support. Network first (so a new version or new data shows up right away when online),
 // falling back to the saved copy when offline or when the network is too slow.
-const CACHE = 'huji-rooms-v16';
+const CACHE = 'huji-rooms-v17';
 const SHELL = ['./', 'index.html', 'app.js', 'core.js', 'combo.js', 'style.css', 'campuses.js', 'data/gr.json', 'data/scopus.json', 'buildings/gr.json', 'buildings/scopus.json', 'paths/gr.json', 'paths/scopus.json',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/favicon-64.png', 'fonts/heebo-hebrew.woff2', 'fonts/heebo-latin.woff2'];
 const TIMEOUT = 4000; // weak campus Wi-Fi: after this, answer from the cache and update in the background

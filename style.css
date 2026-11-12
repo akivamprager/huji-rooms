@@ -316,3 +316,10 @@ button.book-btn { cursor: pointer; font: inherit; font-weight: 600; font-size: .
   text-decoration: none; color: var(--accent); background: var(--accent-soft); border: 1px solid var(--line);
 }
 .contact-btn:hover { border-color: var(--accent); }
+
+/* disclaimer + privacy */
+.disclaimer { margin: 12px 0 6px; }
+.privacy { margin: 6px 0; }
+.privacy summary { cursor: pointer; font-weight: 600; color: var(--text); width: fit-content; }
+.privacy ul { margin: 8px 0 0; padding-inline-start: 20px; display: grid; gap: 4px; line-height: 1.5; }
+.privacy b { color: var(--text); }
