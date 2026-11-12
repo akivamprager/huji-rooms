@@ -20,7 +20,7 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--text);
-  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans Hebrew", Arial, sans-serif;
+  font: 16px/1.5 Heebo, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
 button { font: inherit; color: inherit; }
 a { color: var(--accent); }
