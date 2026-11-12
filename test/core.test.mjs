@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { decode, statusAt, freeRooms, searchRooms, dayOf, weekday, eventsOn, distance, walkMinutes, nearestFree } from '../core.js';
+import { decode, statusAt, freeRooms, searchRooms, dayOf, weekday, eventsOn, distance, walkMinutes, nearestFree, decodePaths, walkingDistances } from '../core.js';
 import { buildRooms, chunkIds, dayNum, fixUndefinedBuildings } from '../tools/rooms.mjs';
 
 const room = (id, name, campus = '1', b = '10') => ({ id, name: { he: name }, building: { code: b, name: { he: 'פלדמן' }, campus: { code: campus } } });
@@ -79,11 +79,11 @@ test('nearestFree: closest building first, skips buildings without a location', 
   // room 1 is busy 10:00–12:45 on 11.10, room 2 is free; both in building 10
   const near = nearestFree(db, { 10: [31.7766, 35.1979] }, [31.7770, 35.1979], { day: d11, minute: 610 });
   assert.deepEqual(near.map((x) => x.room.id), ['2']);
-  assert.ok(near[0].dist > 40 && near[0].dist < 50); // 0.0004° of latitude ≈ 44 m
+  assert.ok(near[0].dist > 52 && near[0].dist < 64); // 0.0004° of latitude ≈ 44 m, × 1.3 without a route
   assert.deepEqual(nearestFree(db, {}, [31.77, 35.19], { day: d11, minute: 610 }), []);
   assert.equal(Math.round(distance([31.7766, 35.1979], [31.7766, 35.1979])), 0);
   assert.equal(walkMinutes(10), 1);
-  assert.equal(walkMinutes(400), 7);
+  assert.equal(walkMinutes(400), 5);
 });
 
 test('nearestFree: among equally close rooms, the one free for longer comes first', () => {
@@ -96,4 +96,18 @@ test('nearestFree: among equally close rooms, the one free for longer comes firs
   // a much further room does not jump ahead
   const far = nearestFree(d, { 10: here, 20: [31.7800, 35.1979] }, here, { day: d11, minute: 710 });
   assert.deepEqual(far.map((x) => x.room.id), ['1', '2']);
+});
+
+test('walkingDistances follows the paths, not a straight line', () => {
+  // an L-shaped path: here (0,0) → corner (0, +100 m east) → building (100 m north of the corner)
+  const o = [31.77, 35.19];
+  const east = 100 / (111320 * Math.cos((o[0] * Math.PI) / 180)) * 1e5;
+  const north = 100 / 110540 * 1e5;
+  const g = decodePaths({ origin: o, n: [0, 0, 0, Math.round(east), Math.round(north), Math.round(east)], e: [0, 1, 1, 2], w: [100, 100], b: { 7: [2, 5] } });
+  const d = walkingDistances(g, o);
+  assert.ok(Math.abs(d[7] - 205) < 3, String(d[7])); // 100 + 100 + 5, not the 141 m diagonal
+  assert.equal(walkingDistances(g, [31.80, 35.19]), null); // kilometres away: no route
+  // used by nearestFree instead of the straight line
+  const near = nearestFree(db, { 10: [31.7766, 35.1979] }, [31.7770, 35.1979], { day: d11, minute: 610, walk: { 10: 300 } });
+  assert.equal(near[0].dist, 300);
 });

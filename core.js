@@ -92,20 +92,120 @@ export function distance([lat1, lon1], [lat2, lon2]) {
     + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(a));
 }
-// Rough walking minutes: paths on campus are ~30% longer than a straight line, ~80 m a minute.
-export const walkMinutes = (m) => Math.max(1, Math.round((m * 1.3) / 80));
+// Walking minutes for a walking distance, at ~80 m a minute (about 5 km/h, like maps apps).
+export const walkMinutes = (m) => Math.max(1, Math.round(m / 80));
+// Without a route, a straight line stands in for the path: paths are ~30% longer.
+const STRAIGHT_TO_PATH = 1.3;
 
-// Free rooms at that moment, closest first. locs: { buildingCode: [lat, lon] } (buildings without
-// a location are skipped). Rooms the same number of walking minutes away count as equally close:
+// Free rooms at that moment, closest first; dist = walking metres. walk: { buildingCode: metres }
+// from walkingDistances (real paths); buildings it doesn't cover fall back to locs ({ code: [lat, lon] })
+// and a straight line. Rooms the same number of walking minutes away count as equally close:
 // among them, the one that stays free longer comes first.
 // perBuilding caps how many rooms one building contributes, so the next buildings show up too.
-export function nearestFree(db, locs, here, { day, minute, limit = 8, perBuilding = 3 }) {
+export function nearestFree(db, locs, here, { day, minute, limit = 8, perBuilding = 3, walk = null }) {
   const { free } = freeRooms(db, { day, minute });
   const taken = {};
+  const dist = (code) => walk?.[code] ?? (locs[code] ? distance(here, locs[code]) * STRAIGHT_TO_PATH : null);
   return free
-    .filter(({ room }) => locs[room.building])
-    .map((x) => ({ ...x, dist: distance(here, locs[x.room.building]) }))
+    .map((x) => ({ ...x, dist: dist(x.room.building) }))
+    .filter((x) => x.dist != null)
     .sort((a, b) => walkMinutes(a.dist) - walkMinutes(b.dist) || (b.until ?? 1e9) - (a.until ?? 1e9) || a.dist - b.dist)
     .filter(({ room }) => (taken[room.building] = (taken[room.building] || 0) + 1) <= perBuilding)
     .slice(0, limit);
+}
+
+// ---- walking routes on the campus path network (paths.json, see tools/paths.mjs) ----
+export function decodePaths(p) {
+  const count = p.n.length / 2;
+  const lat = new Float64Array(count);
+  const lon = new Float64Array(count);
+  for (let i = 0; i < count; i++) { lat[i] = p.origin[0] + p.n[2 * i] / 1e5; lon[i] = p.origin[1] + p.n[2 * i + 1] / 1e5; }
+  const adj = Array.from({ length: count }, () => []);
+  for (let k = 0; k < p.w.length; k++) {
+    const a = p.e[2 * k];
+    const b = p.e[2 * k + 1];
+    adj[a].push(b, p.w[k]);
+    adj[b].push(a, p.w[k]);
+  }
+  return { lat, lon, adj, edges: p.e, w: p.w, b: p.b };
+}
+
+// Walking metres from `here` to every building on the network (shortest path, like a maps app),
+// or null if `here` is too far from any campus path to route from. The map doesn't draw a path
+// across every lawn, plaza or building entrance, so short stretches off the paths are allowed:
+// from `here` to any path point within OFF_PATH metres, and into a building from any path point
+// listed for it (within 70 m, see tools/paths.mjs); off-path metres cost OFF_PATH_COST times more.
+const OFF_PATH = 80;
+const OFF_PATH_COST = 1.2;
+export function walkingDistances(g, here, { maxSnap = 400 } = {}) {
+  // local flat coordinates in metres around `here`
+  const ky = 110540;
+  const kx = 111320 * Math.cos((here[0] * Math.PI) / 180);
+  const X = (i) => (g.lon[i] - here[1]) * kx;
+  const Y = (i) => (g.lat[i] - here[0]) * ky;
+  // snap to the closest point on any path segment
+  let best = null;
+  for (let k = 0; k < g.w.length; k++) {
+    const a = g.edges[2 * k];
+    const b = g.edges[2 * k + 1];
+    const ax = X(a); const ay = Y(a); const bx = X(b); const by = Y(b);
+    const dx = bx - ax; const dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+    const px = ax + t * dx; const py = ay + t * dy;
+    const d = Math.hypot(px, py);
+    if (!best || d < best.d) best = { d, a, b, t, k };
+  }
+  if (!best || best.d > maxSnap) return null;
+  // Dijkstra from both ends of that segment
+  const dist = new Float64Array(g.lat.length).fill(Infinity);
+  const heap = [];
+  const push = (node, d) => {
+    if (d >= dist[node]) return;
+    dist[node] = d;
+    heap.push([d, node]);
+    for (let i = heap.length - 1; i > 0;) {
+      const up = (i - 1) >> 1;
+      if (heap[up][0] <= heap[i][0]) break;
+      [heap[up], heap[i]] = [heap[i], heap[up]];
+      i = up;
+    }
+  };
+  const pop = () => {
+    const top = heap[0];
+    const last = heap.pop();
+    if (heap.length) {
+      heap[0] = last;
+      for (let i = 0; ;) {
+        const l = 2 * i + 1; const r = l + 1;
+        let m = i;
+        if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+        if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+        if (m === i) break;
+        [heap[m], heap[i]] = [heap[i], heap[m]];
+        i = m;
+      }
+    }
+    return top;
+  };
+  const segLen = g.w[best.k];
+  push(best.a, best.d + segLen * best.t);
+  push(best.b, best.d + segLen * (1 - best.t));
+  for (let i = 0; i < g.lat.length; i++) {
+    const d = Math.hypot(X(i), Y(i));
+    if (d <= OFF_PATH) push(i, d * OFF_PATH_COST);
+  }
+  while (heap.length) {
+    const [d, node] = pop();
+    if (d > dist[node]) continue;
+    const nb = g.adj[node];
+    for (let i = 0; i < nb.length; i += 2) push(nb[i], d + nb[i + 1]);
+  }
+  const out = {};
+  for (const [code, list] of Object.entries(g.b)) {
+    let m = Infinity;
+    for (let i = 0; i < list.length; i += 2) m = Math.min(m, dist[list[i]] + list[i + 1] * OFF_PATH_COST);
+    if (m < Infinity) out[code] = m;
+  }
+  return out;
 }

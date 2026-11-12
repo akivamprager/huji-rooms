@@ -1,4 +1,4 @@
-import { decode, statusAt, freeRooms, eventsOn, dayOf, dateOf, weekday, hm, GAP, nearestFree, walkMinutes } from './core.js';
+import { decode, statusAt, freeRooms, eventsOn, dayOf, dateOf, weekday, hm, GAP, nearestFree, walkMinutes, decodePaths, walkingDistances } from './core.js';
 import { combo } from './combo.js';
 
 const $ = (id) => document.getElementById(id);
@@ -278,11 +278,21 @@ function renderFree() {
 }
 
 // ---- closest free room ----
+// campus walking network (paths.json), loaded the first time it's needed
+let paths = null;
+const loadPaths = () => (paths ||= fetch('paths.json').then((r) => (r.ok ? r.json() : null)).then((p) => p && decodePaths(p)).catch(() => null));
+
 function locate() {
+  loadPaths();
   if (!navigator.geolocation) { state.near = { error: 'הדפדפן הזה לא תומך במיקום.' }; render(); return; }
   state.near = 'locating';
   navigator.geolocation.getCurrentPosition(
-    (pos) => { state.near = { here: [pos.coords.latitude, pos.coords.longitude], acc: pos.coords.accuracy }; render(); },
+    async (pos) => {
+      const here = [pos.coords.latitude, pos.coords.longitude];
+      const g = await loadPaths();
+      state.near = { here, walk: g ? walkingDistances(g, here) : null };
+      render();
+    },
     (err) => {
       state.near = { error: err.code === 1
         ? 'אין הרשאה למיקום. אפשר לאשר אותה בהגדרות הדפדפן לאתר הזה ולנסות שוב.'
@@ -303,8 +313,9 @@ function nearResults(el, day, minute) {
   }
   if (!inData(day)) { availability(el, null, day, minute); return; }
   const locs = Object.fromEntries(Object.entries(extras).filter(([, v]) => v.loc).map(([k, v]) => [k, v.loc]));
-  const list = nearestFree(db, locs, state.near.here, { day, minute, limit: 9 });
-  const far = list.length && list[0].dist > 1500;
+  const routed = !!state.near.walk;
+  const list = nearestFree(db, locs, state.near.here, { day, minute, limit: 9, walk: state.near.walk });
+  const far = list.length && list[0].dist > 2000;
   const cards = list.map(({ room, until, dist }) => {
     const left = until == null ? TO - minute : until - minute;
     return `<button class="room-card" data-goto="${esc(room.id)}">
@@ -313,9 +324,9 @@ function nearResults(el, day, minute) {
       <span class="rc-until free">${until == null ? 'פנוי עד סוף היום' : `פנוי עד ${LTR(hm(until))} · ${dur(left)}`}</span></button>`;
   }).join('');
   el.innerHTML = `${head(` <span class="count">${list.length}</span>`)}
-    ${far ? '<p class="book-note">נראה שאתם מחוץ לקמפוס — המרחקים הם בקו אווירי מהמיקום שלכם.</p>' : ''}
+    ${!routed ? `<p class="book-note">${far ? 'נראה שאתם מחוץ לקמפוס — ' : ''}המרחקים משוערים לפי קו אווירי, כי לא נמצא שביל הליכה קרוב למיקום שלכם.</p>` : ''}
     <div class="room-grid">${cards || '<p class="muted">אין כרגע חדר פנוי בבניינים שהמיקום שלהם ידוע.</p>'}</div>
-    <p class="book-note">המיקום נשאר במכשיר שלך ולא נשמר. מרחקים לפי <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.</p>`;
+    <p class="book-note">🔒 המיקום לא נשלח לשום מקום ולא נשמר — המסלולים מחושבים במכשיר שלך. מפת השבילים: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>.</p>`;
 }
 
 // Free rooms (longest free first, "until when") and busy ones (when they free up) → el.

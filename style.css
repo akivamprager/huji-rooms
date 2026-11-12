@@ -268,16 +268,18 @@ button.book-btn { cursor: pointer; font: inherit; font-weight: 600; font-size: .
 }
 
 /* closest free room */
+.hero-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.hero-actions .seg { margin-top: 0; }
 .near-btn {
-  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; max-width: 420px; margin-top: 12px;
-  border: 0; border-radius: 14px; padding: 11px 16px; cursor: pointer; font-weight: 700; font-size: 1rem;
-  color: #0b3d2a; background: linear-gradient(180deg, #5ee3ad, #3cc98f); box-shadow: 0 6px 18px rgb(0 0 0 / .2);
+  display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgb(255 255 255 / .28); border-radius: 14px;
+  padding: 0 14px; height: 48px; cursor: pointer; font-weight: 600; font-size: .95rem; color: #fff;
+  background: rgb(255 255 255 / .14); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
-.near-btn:hover { filter: brightness(1.05); }
-.near-btn:active { transform: translateY(1px); }
+.near-btn::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #5ee3ad; box-shadow: 0 0 0 3px rgb(94 227 173 / .3); }
+.near-btn:hover { background: rgb(255 255 255 / .24); }
 .near-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
 .near-head .section-title { margin: 6px 2px; }
 .rc-walk { font-size: .82rem; color: var(--muted); margin-top: 4px; }
 .spin { animation: bob 1s ease-in-out infinite; }
 @keyframes bob { 50% { transform: translateY(-6px); } }
-@media (max-width: 720px) { .near-btn { max-width: none; } }
+@media (max-width: 720px) { .hero-actions .seg { flex: 1 1 100%; } .near-btn { height: 40px; } }
