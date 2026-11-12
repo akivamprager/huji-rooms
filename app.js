@@ -13,7 +13,7 @@ const BOOKING = 'https://www.huji.ac.il/rooms/';
 const LTR = (s) => `⁦${s}⁩`;
 
 let db;
-let extras = {}; // building code → { aliases: [...], photo: { url, credit, page } } (buildings.json, optional)
+let extras = {}; // building code → { aliases: [...] } (buildings.json, optional)
 const state = { tab: 'room', building: null, room: null, week: null, dayIdx: null, freeBuilding: null, day: null, minute: null };
 
 const nowDay = () => dayOf(new Date());
@@ -117,16 +117,9 @@ function writeHash() {
   history.replaceState(null, '', h ? `#${h}` : location.pathname + location.search);
 }
 
-// ---- hero photo of the selected building ----
+// ---- header subtitle ----
 function renderHero() {
   const code = state.tab === 'room' ? state.building : state.freeBuilding;
-  const ph = code && extras[code]?.photo;
-  const bg = $('hero-bg');
-  if (ph) bg.style.setProperty('--photo', `url("${ph.url}")`); else bg.style.removeProperty('--photo');
-  $('hero').classList.toggle('has-photo', !!ph);
-  const credit = $('photo-credit');
-  credit.hidden = !ph;
-  if (ph) { credit.textContent = `📷 ${ph.credit}`; credit.href = ph.page; }
   const room = state.tab === 'room' && state.room && db.rooms.get(state.room);
   const aka = code && aliases(code)[0] ? ` (${aliases(code)[0]})` : '';
   $('hero-sub').textContent = room ? `${room.name === room.buildingName ? room.name : `${room.name} · ${room.buildingName}`}${aka}` : code ? `${bName(code)}${aka}` : 'מה תפוס, מה פנוי ומתי — לפי השנתון';
