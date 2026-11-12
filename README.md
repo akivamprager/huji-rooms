@@ -25,4 +25,4 @@ Covers only sessions listed in the Shnaton: no exams and no one-off events.
 - No accounts, analytics, cookies or tracking.
 - Location (for "הכי קרוב אליי") is used only in the page's memory while it's open. It is never sent anywhere or saved, and the walking routes are computed on the device.
 - Favorites and the last room are saved only in the browser (localStorage).
-- The only requests are the site's own files (Cloudflare Pages) and the Heebo font (Google Fonts). Like any website, these see the visitor's IP address, never their location.
+- The only requests are to the site itself (Cloudflare Pages), including the Heebo font in `fonts/` (SIL Open Font License, `fonts/OFL.txt`). No third-party services.

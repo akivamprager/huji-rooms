@@ -1,8 +1,8 @@
 // Offline support. Network first (so a new version or new data shows up right away when online),
-// falling back to the saved copy when offline or when the network is too slow. Fonts: cache first.
-const CACHE = 'huji-rooms-v9';
+// falling back to the saved copy when offline or when the network is too slow.
+const CACHE = 'huji-rooms-v10';
 const SHELL = ['./', 'index.html', 'app.js', 'core.js', 'combo.js', 'style.css', 'buildings.json', 'data.json', 'paths.json',
-  'manifest.webmanifest', 'icons/icon-192.png', 'icons/favicon-64.png'];
+  'manifest.webmanifest', 'icons/icon-192.png', 'icons/favicon-64.png', 'fonts/heebo-hebrew.woff2', 'fonts/heebo-latin.woff2'];
 const TIMEOUT = 4000; // weak campus Wi-Fi: after this, answer from the cache and update in the background
 
 self.addEventListener('install', (e) => {
@@ -20,14 +20,6 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
-    e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE).then((c) => c.put(req, copy));
-      return res;
-    })));
-    return;
-  }
   if (url.origin !== location.origin) return;
   e.respondWith(networkFirst(req, e));
 });
