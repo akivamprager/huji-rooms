@@ -1,0 +1,217 @@
+{
+ "156": {
+  "name": "ארונברג",
+  "aliases": [
+   "מכון פריץ האבר",
+   "Aaronberg",
+   "Fritz Haber"
+  ]
+ },
+ "1": {
+  "name": "בניין המעבדות ברנדמן",
+  "aliases": [
+   "ברנדמן",
+   "Brandman"
+  ]
+ },
+ "152": {
+  "name": "בנין צרפת",
+  "aliases": [
+   "בית צרפת",
+   "Maison de France",
+   "France House"
+  ],
+  "photo": {
+   "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/France_House.jpg/1280px-France_House.jpg",
+   "credit": "Wikimedia Commons · Public domain",
+   "page": "https://commons.wikimedia.org/wiki/File:France_House.jpg"
+  }
+ },
+ "159": {
+  "name": "ברגמן",
+  "aliases": [
+   "Bergman"
+  ]
+ },
+ "154": {
+  "name": "ברמן",
+  "aliases": [
+   "בניין משפחת ברמן",
+   "אוספי הטבע הלאומיים",
+   "Berman"
+  ],
+  "photo": {
+   "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/NatureScienceLibrary8136.JPG/1280px-NatureScienceLibrary8136.JPG",
+   "credit": "Wikimedia Commons · יעקב · CC BY-SA 3.0",
+   "page": "https://commons.wikimedia.org/wiki/File:NatureScienceLibrary8136.JPG"
+  }
+ },
+ "153": {
+  "name": "גודמן",
+  "aliases": [
+   "מדעי המוח",
+   "מרכז ספרא למדעי המוח",
+   "ELSC",
+   "Goodman",
+   "Brain Sciences"
+  ]
+ },
+ "160": {
+  "name": "דנציגר א",
+  "aliases": [
+   "Danciger A"
+  ]
+ },
+ "4": {
+  "name": "דנציגר ב",
+  "aliases": [
+   "Danciger B"
+  ],
+  "photo": {
+   "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Danciger_B_Bldg.jpg/1280px-Danciger_B_Bldg.jpg",
+   "credit": "Wikimedia Commons · Public domain",
+   "page": "https://commons.wikimedia.org/wiki/File:Danciger_B_Bldg.jpg"
+  }
+ },
+ "31": {
+  "name": "הנדסה",
+  "aliases": [
+   "בניין מדמ״ח",
+   "בית הספר להנדסה ולמדעי המחשב",
+   "מדמ\"ח",
+   "מדעי המחשב",
+   "רוטברג",
+   "בניין רוטברג",
+   "בית ספר בנין",
+   "Engineering",
+   "Computer Science",
+   "CS",
+   "Rothberg"
+  ]
+ },
+ "200": {
+  "name": "הספרייה הלאומית הישנה",
+  "aliases": [
+   "בניין ליידי דייוויס",
+   "הספרייה הלאומית",
+   "Lady Davis",
+   "Old National Library"
+  ]
+ },
+ "2": {
+  "name": "לוי",
+  "aliases": [
+   "בניין יעקב לוי",
+   "Levy"
+  ],
+  "photo": {
+   "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Levy_Bldg.jpg/1280px-Levy_Bldg.jpg",
+   "credit": "Wikimedia Commons · Public domain",
+   "page": "https://commons.wikimedia.org/wiki/File:Levy_Bldg.jpg"
+  }
+ },
+ "3": {
+  "name": "לוין",
+  "aliases": [
+   "Levin"
+  ]
+ },
+ "5": {
+  "name": "לוס אנגלס",
+  "aliases": [
+   "כימיה",
+   "Los Angeles",
+   "Chemistry"
+  ],
+  "photo": {
+   "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Los_Angels_Bldg.jpg/1280px-Los_Angels_Bldg.jpg",
+   "credit": "Wikimedia Commons · Public domain",
+   "page": "https://commons.wikimedia.org/wiki/File:Los_Angels_Bldg.jpg"
+  }
+ },
+ "8": {
+  "name": "ליאון/דרום אפריקה",
+  "aliases": [
+   "ליאון",
+   "דרום אפריקה",
+   "Leon",
+   "South Africa"
+  ]
+ },
+ "10": {
+  "name": "מנצ'סטר",
+  "aliases": [
+   "מתמטיקה",
+   "מכון איינשטיין למתמטיקה",
+   "Manchester",
+   "Math"
+  ],
+  "photo": {
+   "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Manchcstr2_Bldg.jpg/1280px-Manchcstr2_Bldg.jpg",
+   "credit": "Wikimedia Commons · Public domain",
+   "page": "https://commons.wikimedia.org/wiki/File:Manchcstr2_Bldg.jpg"
+  }
+ },
+ "11": {
+  "name": "סילברמן",
+  "aliases": [
+   "מדעי החיים",
+   "מכון סילברמן למדעי החיים",
+   "Silberman",
+   "Life Sciences"
+  ]
+ },
+ "13": {
+  "name": "פלדמן",
+  "aliases": [
+   "המכון ללימודים מתקדמים",
+   "Feldman"
+  ]
+ },
+ "14": {
+  "name": "קנדה",
+  "aliases": [
+   "אולם קנדה",
+   "Canada Hall"
+  ]
+ },
+ "30": {
+  "name": "קפלן",
+  "aliases": [
+   "אולם הרצאות קפלן",
+   "מכון רקח",
+   "פיזיקה",
+   "Kaplun",
+   "Physics"
+  ],
+  "photo": {
+   "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Kaplun_Bldg.jpg/1280px-Kaplun_Bldg.jpg",
+   "credit": "Wikimedia Commons · Public domain",
+   "page": "https://commons.wikimedia.org/wiki/File:Kaplun_Bldg.jpg"
+  }
+ },
+ "137": {
+  "name": "רוס",
+  "aliases": [
+   "בניין ג'יימס רוס",
+   "Ross"
+  ],
+  "photo": {
+   "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Ross_Bldg.jpg/1280px-Ross_Bldg.jpg",
+   "credit": "Wikimedia Commons · Public domain",
+   "page": "https://commons.wikimedia.org/wiki/File:Ross_Bldg.jpg"
+  }
+ },
+ "15": {
+  "name": "שפרינצק",
+  "aliases": [
+   "חוות המחשבים",
+   "Sprinzak"
+  ],
+  "photo": {
+   "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/Sprinzak1_Bldg.jpg/1280px-Sprinzak1_Bldg.jpg",
+   "credit": "Wikimedia Commons · Public domain",
+   "page": "https://commons.wikimedia.org/wiki/File:Sprinzak1_Bldg.jpg"
+  }
+ }
+}

@@ -19,7 +19,10 @@
           <h1>חדרים בגבעת רם</h1>
           <p class="hero-sub" id="hero-sub">מה תפוס, מה פנוי ומתי — לפי השנתון</p>
         </div>
-        <a id="photo-credit" class="photo-credit" target="_blank" rel="noopener" hidden></a>
+        <div class="hero-side">
+          <a class="book-btn" href="https://www.huji.ac.il/rooms/" target="_blank" rel="noopener" title="מערכת הזמנת חדרי לימוד של האוניברסיטה">📅 הזמנת חדר</a>
+          <a id="photo-credit" class="photo-credit" target="_blank" rel="noopener" hidden></a>
+        </div>
       </div>
       <nav class="seg" role="tablist" aria-label="מצב">
         <button role="tab" data-tab="room"><span aria-hidden="true">🚪</span> חדר מסוים</button>
@@ -56,9 +59,9 @@
           <div class="week-bar">
             <h2 id="week-label"></h2>
             <div class="week-nav">
-              <button class="icon-btn" data-week="-1" aria-label="שבוע קודם">›</button>
+              <button class="icon-btn" data-week="-1" aria-label="שבוע קודם"><span class="chev right"></span></button>
               <button class="pill-btn" data-week="0">השבוע</button>
-              <button class="icon-btn" data-week="1" aria-label="שבוע הבא">‹</button>
+              <button class="icon-btn" data-week="1" aria-label="שבוע הבא"><span class="chev left"></span></button>
             </div>
           </div>
           <div class="legend"><span class="lg lec"></span>שיעור <span class="lg rec"></span>תרגיל / אחר <span class="lg gap"></span>פנוי</div>
