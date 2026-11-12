@@ -82,3 +82,30 @@ export function searchRooms(db, query) {
   });
   return list.sort((a, b) => a.buildingName.localeCompare(b.buildingName, 'he') || a.name.localeCompare(b.name, 'he', { numeric: true }));
 }
+
+// ---- nearest free room ----
+// Straight-line distance in metres between two [lat, lon] points.
+export function distance([lat1, lon1], [lat2, lon2]) {
+  const R = 6371000;
+  const rad = Math.PI / 180;
+  const a = Math.sin(((lat2 - lat1) * rad) / 2) ** 2
+    + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+// Rough walking minutes: paths on campus are ~30% longer than a straight line, ~80 m a minute.
+export const walkMinutes = (m) => Math.max(1, Math.round((m * 1.3) / 80));
+
+// Free rooms at that moment, closest first. locs: { buildingCode: [lat, lon] } (buildings without
+// a location are skipped). Rooms the same number of walking minutes away count as equally close:
+// among them, the one that stays free longer comes first.
+// perBuilding caps how many rooms one building contributes, so the next buildings show up too.
+export function nearestFree(db, locs, here, { day, minute, limit = 8, perBuilding = 3 }) {
+  const { free } = freeRooms(db, { day, minute });
+  const taken = {};
+  return free
+    .filter(({ room }) => locs[room.building])
+    .map((x) => ({ ...x, dist: distance(here, locs[x.room.building]) }))
+    .sort((a, b) => walkMinutes(a.dist) - walkMinutes(b.dist) || (b.until ?? 1e9) - (a.until ?? 1e9) || a.dist - b.dist)
+    .filter(({ room }) => (taken[room.building] = (taken[room.building] || 0) + 1) <= perBuilding)
+    .slice(0, limit);
+}

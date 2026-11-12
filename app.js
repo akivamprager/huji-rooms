@@ -1,4 +1,4 @@
-import { decode, statusAt, freeRooms, eventsOn, dayOf, dateOf, weekday, hm, GAP } from './core.js';
+import { decode, statusAt, freeRooms, eventsOn, dayOf, dateOf, weekday, hm, GAP, nearestFree, walkMinutes } from './core.js';
 import { combo } from './combo.js';
 
 const $ = (id) => document.getElementById(id);
@@ -14,7 +14,8 @@ const LTR = (s) => `⁦${s}⁩`;
 
 let db;
 let extras = {}; // building code → { aliases: [...] } (buildings.json, optional)
-const state = { tab: 'room', building: null, room: null, week: null, dayIdx: null, freeBuilding: null, day: null, minute: null };
+// near: null | 'locating' | { here: [lat, lon] } | { error } — the location is never put in the URL or saved
+const state = { tab: 'room', building: null, room: null, week: null, dayIdx: null, freeBuilding: null, day: null, minute: null, near: null };
 
 const nowDay = () => dayOf(new Date());
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
@@ -95,6 +96,9 @@ function readHash({ start = false } = {}) {
   const favB = fav.buildings.find((c) => bName(c));
   if (start && !p.toString() && favB) {
     Object.assign(state, { tab: 'free', freeBuilding: favB, day: null, minute: null });
+  } else if (p.has('near')) {
+    Object.assign(state, { tab: 'free', day: null, minute: null });
+    if (!state.near?.here) locate();
   } else if (p.has('free')) {
     state.tab = 'free';
     state.freeBuilding = bName(p.get('free')) ? p.get('free') : null;
@@ -110,7 +114,8 @@ function readHash({ start = false } = {}) {
 }
 function writeHash() {
   const p = new URLSearchParams();
-  if (state.tab === 'free') {
+  if (state.tab === 'free' && state.near) p.set('near', '');
+  else if (state.tab === 'free') {
     p.set('free', state.freeBuilding || '');
     if (state.day != null) p.set('d', state.day);
     if (state.minute != null) p.set('t', state.minute);
@@ -265,7 +270,52 @@ function renderFree() {
   $('free-date').value = isoOf(day);
   $('free-time').value = hm(minute);
   $('free-favs').innerHTML = favChips(true);
-  availability($('free-result'), state.freeBuilding, day, minute);
+  // the closest-room list is about right now: hide the building / date / time pickers meanwhile
+  document.querySelector('.free-pickers').hidden = !!state.near;
+  $('free-favs').hidden = !!state.near;
+  if (state.near) nearResults($('free-result'), day, minute);
+  else availability($('free-result'), state.freeBuilding, day, minute);
+}
+
+// ---- closest free room ----
+function locate() {
+  if (!navigator.geolocation) { state.near = { error: 'הדפדפן הזה לא תומך במיקום.' }; render(); return; }
+  state.near = 'locating';
+  navigator.geolocation.getCurrentPosition(
+    (pos) => { state.near = { here: [pos.coords.latitude, pos.coords.longitude], acc: pos.coords.accuracy }; render(); },
+    (err) => {
+      state.near = { error: err.code === 1
+        ? 'אין הרשאה למיקום. אפשר לאשר אותה בהגדרות הדפדפן לאתר הזה ולנסות שוב.'
+        : 'לא הצלחתי לקבל מיקום. נסו שוב בעוד רגע.' };
+      render();
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+  );
+}
+
+function nearResults(el, day, minute) {
+  const head = (extra = '') => `<div class="near-head"><h2 class="section-title">📍 הכי קרובים אליך${extra}</h2>
+    <button class="pill-btn" data-near-off="1">✕ חזרה לחיפוש לפי בניין</button></div>`;
+  if (state.near === 'locating') { el.innerHTML = `${head()}<div class="empty"><div class="empty-icon spin" aria-hidden="true">📍</div><p>מאתר את המיקום שלך…</p></div>`; return; }
+  if (state.near.error) {
+    el.innerHTML = `${head()}<div class="empty"><div class="empty-icon" aria-hidden="true">🧭</div><p>${esc(state.near.error)}</p><button class="pill-btn" data-near="1">לנסות שוב</button></div>`;
+    return;
+  }
+  if (!inData(day)) { availability(el, null, day, minute); return; }
+  const locs = Object.fromEntries(Object.entries(extras).filter(([, v]) => v.loc).map(([k, v]) => [k, v.loc]));
+  const list = nearestFree(db, locs, state.near.here, { day, minute, limit: 9 });
+  const far = list.length && list[0].dist > 1500;
+  const cards = list.map(({ room, until, dist }) => {
+    const left = until == null ? TO - minute : until - minute;
+    return `<button class="room-card" data-goto="${esc(room.id)}">
+      <span class="rc-name">${esc(room.name)}</span><span class="rc-b">${esc(room.buildingName)}</span>
+      <span class="rc-walk">🚶 ${far ? `${(dist / 1000).toFixed(1)} ק״מ` : dist < 30 ? 'ממש לידך' : `${walkMinutes(dist)} דק׳ הליכה · ${LTR(`${Math.round(dist / 10) * 10}`)} מ׳`}</span>
+      <span class="rc-until free">${until == null ? 'פנוי עד סוף היום' : `פנוי עד ${LTR(hm(until))} · ${dur(left)}`}</span></button>`;
+  }).join('');
+  el.innerHTML = `${head(` <span class="count">${list.length}</span>`)}
+    ${far ? '<p class="book-note">נראה שאתם מחוץ לקמפוס — המרחקים הם בקו אווירי מהמיקום שלכם.</p>' : ''}
+    <div class="room-grid">${cards || '<p class="muted">אין כרגע חדר פנוי בבניינים שהמיקום שלהם ידוע.</p>'}</div>
+    <p class="book-note">המיקום נשאר במכשיר שלך ולא נשמר. מרחקים לפי <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.</p>`;
 }
 
 // Free rooms (longest free first, "until when") and busy ones (when they free up) → el.
@@ -298,9 +348,12 @@ function availability(el, building, day, minute, { when = '' } = {}) {
 document.addEventListener('click', (e) => {
   const t = e.target.closest('button');
   if (!t || t.closest('.combo')) return;
-  if (t.dataset.tab) { state.tab = t.dataset.tab; render(); }
+  if (t.dataset.near) { state.tab = 'free'; state.day = null; state.minute = null; locate(); render(); scrollTo({ top: 0, behavior: 'smooth' }); }
+  else if (t.dataset.nearOff) { state.near = null; render(); }
+  else if (t.dataset.tab) { state.tab = t.dataset.tab; render(); }
   else if (t.dataset.fav) { toggleFav(t.dataset.fav, t.dataset.id); render(); }
   else if (t.dataset.building) {
+    state.near = null;
     if (t.dataset.for === 'free') state.freeBuilding = t.dataset.building === state.freeBuilding ? null : t.dataset.building;
     else { state.building = t.dataset.building; if (state.room && db.rooms.get(state.room).building !== state.building) state.room = null; }
     render();
@@ -384,7 +437,7 @@ try {
   freeBuildingBox = combo($('free-building'), {
     placeholder: 'כל גבעת רם',
     options: buildingOptions(true),
-    onSelect: (v) => { state.freeBuilding = v || null; render(); },
+    onSelect: (v) => { state.freeBuilding = v || null; state.near = null; render(); },
   });
   if (db.builtAt) $('built').textContent = `עודכן ${new Date(db.builtAt).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}`;
   $('loading').remove();

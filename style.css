@@ -266,3 +266,18 @@ button.book-btn { cursor: pointer; font: inherit; font-weight: 600; font-size: .
 @media (display-mode: standalone), (display-mode: window-controls-overlay), (display-mode: minimal-ui) {
   #install-btn { display: none !important; }
 }
+
+/* closest free room */
+.near-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; max-width: 420px; margin-top: 12px;
+  border: 0; border-radius: 14px; padding: 11px 16px; cursor: pointer; font-weight: 700; font-size: 1rem;
+  color: #0b3d2a; background: linear-gradient(180deg, #5ee3ad, #3cc98f); box-shadow: 0 6px 18px rgb(0 0 0 / .2);
+}
+.near-btn:hover { filter: brightness(1.05); }
+.near-btn:active { transform: translateY(1px); }
+.near-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.near-head .section-title { margin: 6px 2px; }
+.rc-walk { font-size: .82rem; color: var(--muted); margin-top: 4px; }
+.spin { animation: bob 1s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(-6px); } }
+@media (max-width: 720px) { .near-btn { max-width: none; } }
