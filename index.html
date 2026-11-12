@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://upload.wikimedia.org; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1e2a5a">
+  <meta name="description" content="איזה חדר בגבעת רם תפוס ומתי — לפי השנתון של האוניברסיטה העברית">
+  <title>חדרים בגבעת רם</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏫</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="hero" class="hero">
+    <div class="hero-bg" id="hero-bg"></div>
+    <div class="hero-inner">
+      <div class="hero-top">
+        <div>
+          <h1>חדרים בגבעת רם</h1>
+          <p class="hero-sub" id="hero-sub">מה תפוס, מה פנוי ומתי — לפי השנתון</p>
+        </div>
+        <a id="photo-credit" class="photo-credit" target="_blank" rel="noopener" hidden></a>
+      </div>
+      <nav class="seg" role="tablist" aria-label="מצב">
+        <button role="tab" data-tab="room"><span aria-hidden="true">🚪</span> חדר מסוים</button>
+        <button role="tab" data-tab="free"><span aria-hidden="true">✨</span> מצא חדר פנוי</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <p id="loading" class="card muted">טוען נתונים…</p>
+
+    <!-- room -->
+    <section id="tab-room" hidden>
+      <div class="card pickers">
+        <div class="field">
+          <span class="field-label">בניין</span>
+          <div class="field-row"><div id="room-building" class="grow"></div><span id="room-building-star"></span></div>
+        </div>
+        <div class="field">
+          <span class="field-label">חדר</span>
+          <div id="room-room"></div>
+        </div>
+      </div>
+      <div id="favs" class="favs"></div>
+
+      <div id="room-empty" class="empty">
+        <div class="empty-icon" aria-hidden="true">🏛️</div>
+        <p>בחרו בניין וחדר כדי לראות מתי הוא תפוס.</p>
+      </div>
+
+      <div id="room-view" hidden>
+        <div id="status" class="card status"></div>
+        <div class="card">
+          <div class="week-bar">
+            <h2 id="week-label"></h2>
+            <div class="week-nav">
+              <button class="icon-btn" data-week="-1" aria-label="שבוע קודם">›</button>
+              <button class="pill-btn" data-week="0">השבוע</button>
+              <button class="icon-btn" data-week="1" aria-label="שבוע הבא">‹</button>
+            </div>
+          </div>
+          <div class="legend"><span class="lg lec"></span>שיעור <span class="lg rec"></span>תרגיל / אחר <span class="lg gap"></span>פנוי</div>
+          <div id="week" class="week"></div>
+          <div id="agenda" class="agenda"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- free rooms -->
+    <section id="tab-free" hidden>
+      <div class="card pickers free-pickers">
+        <div class="field">
+          <span class="field-label">בניין</span>
+          <div id="free-building"></div>
+        </div>
+        <label class="field">
+          <span class="field-label">תאריך</span>
+          <input id="free-date" type="date" class="input">
+        </label>
+        <label class="field">
+          <span class="field-label">שעה</span>
+          <input id="free-time" type="time" step="900" class="input">
+        </label>
+        <button id="free-now" class="pill-btn now-btn">עכשיו</button>
+      </div>
+      <div id="free-favs" class="favs"></div>
+      <div id="free-result"></div>
+    </section>
+  </main>
+
+  <footer>
+    לפי <a href="https://shnaton.huji.ac.il/" target="_blank" rel="noopener">שנתון האוניברסיטה העברית</a> ·
+    הרצאות ותרגולים בלבד, לא בחינות ואירועים · <span id="built"></span>
+  </footer>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

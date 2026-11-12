@@ -1,0 +1,35 @@
+name: Refresh room data
+
+on:
+  schedule:
+    # once a day, ~03:17 Israel time (off the hour: GitHub delays runs at :00)
+    - cron: '17 0 * * *'
+  workflow_dispatch: # "Run workflow" button for a refresh by hand
+
+permissions:
+  contents: write # to commit data.json
+
+concurrency:
+  group: data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      # actions pinned to exact commits (a tag can be moved; a commit can't)
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - run: node tools/rooms.mjs
+        env:
+          TZ: Asia/Jerusalem
+      # commit only when the Shnaton actually changed (the script leaves data.json alone otherwise)
+      - run: |
+          if git diff --quiet -- data.json; then echo "no change"; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data.json
+          git commit -m "Update room data from the Shnaton"
+          git push

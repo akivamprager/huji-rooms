@@ -1,0 +1,9 @@
+{
+  "name": "huji-rooms",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build-data": "node tools/rooms.mjs",
+    "test": "node --test test/"
+  }
+}
