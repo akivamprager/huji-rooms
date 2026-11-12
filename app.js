@@ -318,6 +318,19 @@ addEventListener('hashchange', () => { readHash(); render(); });
 setInterval(() => { if (!document.hidden && !document.activeElement?.closest('.combo')) render(); }, 60_000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && db) render(); });
 
+// ---- installable app (PWA) ----
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+let installPrompt = null;
+addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; $('install-btn').hidden = false; });
+addEventListener('appinstalled', () => { installPrompt = null; $('install-btn').hidden = true; });
+$('install-btn').addEventListener('click', async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice;
+  installPrompt = null;
+  $('install-btn').hidden = true;
+});
+
 // ---- start ----
 try {
   const [res, ph] = await Promise.all([

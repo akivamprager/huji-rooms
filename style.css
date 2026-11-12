@@ -259,3 +259,6 @@ bdi { unicode-bidi: isolate; direction: ltr; white-space: nowrap; }
 @media (max-width: 720px) {
   .book-btn { padding: 5px 11px; font-size: .8rem; }
 }
+
+button.book-btn { cursor: pointer; font: inherit; font-weight: 600; font-size: .9rem; }
+@media (max-width: 720px) { button.book-btn { font-size: .8rem; } .hero-side { flex-direction: row; flex-wrap: wrap; } }
