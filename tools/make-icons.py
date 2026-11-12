@@ -1,5 +1,5 @@
-# Draws the app icons (no dependencies): a university building wearing a graduation cap, on an indigo
-# gradient; one window and the tassel are green ("a free room"). Run: python3 tools/make-icons.py → icons/*.png
+# Draws the app icons (no dependencies): a building and a magnifying glass on an indigo gradient; the
+# window seen through the lens is green ("found a free room"). Run: python3 tools/make-icons.py → icons/*.png
 import struct, zlib, os
 
 def png(path, w, h, px):
@@ -18,30 +18,6 @@ def seg_dist(u, v, x1, y1, x2, y2):
     t = max(0, min(1, ((u - x1) * dx + (v - y1) * dy) / (dx * dx + dy * dy)))
     return ((u - x1 - t * dx) ** 2 + (v - y1 - t * dy) ** 2) ** .5
 
-def cap(u, v):
-    """Graduation cap in its own 0..1 box → colour or None."""
-    TX, TOPY, BOT = 0.78, 0.43, 0.70
-    if abs(u - TX) <= 0.018 and TOPY <= v <= BOT - 0.08: return GREEN
-    if TX - 0.04 <= u <= TX + 0.04 and BOT - 0.09 <= v <= BOT: return GREEN
-    if abs(u - 0.5) / 0.40 + abs(v - 0.38) / 0.17 <= 1:
-        if (u - 0.5) ** 2 + (v - 0.38) ** 2 <= 0.032 ** 2: return INK
-        if seg_dist(u, v, 0.5, 0.38, TX, TOPY) <= 0.014: return GREEN
-        return WHITE
-    if 0.29 <= u <= 0.71 and 0.44 <= v <= 0.58 + 0.05 * (1 - ((u - 0.5) / 0.21) ** 2): return SHADE
-    return None
-
-def building(u, v):
-    """Building in its own 0..1 box → colour or None."""
-    if 0.20 <= u <= 0.80 and 0.10 <= v <= 0.86:
-        for i in range(3):
-            for j in range(3):
-                wx, wy = 0.27 + i * 0.17, 0.20 + j * 0.20
-                if wx <= u <= wx + 0.12 and wy <= v <= wy + 0.12:
-                    return GREEN if (i, j) == (2, 0) else INK
-        return WHITE
-    if 0.12 <= u <= 0.88 and 0.86 <= v <= 0.92: return WHITE  # steps / ground
-    return None
-
 def color_at(x, y, maskable):
     """x, y in 0..1 → (r, g, b, a)."""
     if not maskable:  # rounded square with transparent corners
@@ -51,11 +27,27 @@ def color_at(x, y, maskable):
     bg = lerp(TOP, BOTTOM, (x * 0.4 + y * 0.6))
     s = 0.80 if maskable else 1.0  # maskable: keep the drawing inside the safe zone
     u, v = 0.5 + (x - 0.5) / s, 0.5 + (y - 0.5) / s
-    # cap sits on the roof: cap box (0.17..0.83) x (0.06..0.50), building box (0.25..0.75) x (0.38..0.86)
-    c = cap((u - 0.17) / 0.66, (v - 0.115) / 0.50)
-    if c: return (*c, 255)
-    c = building((u - 0.25) / 0.50, (v - 0.37) / 0.52)
-    if c: return (*c, 255)
+
+    # magnifying glass, bottom-right, over the building
+    MX, MY, R, RING = 0.62, 0.60, 0.17, 0.045
+    d = ((u - MX) ** 2 + (v - MY) ** 2) ** .5
+    hx, hy = MX + R * 0.72, MY + R * 0.72                 # handle starts on the rim at 45°
+    handle = seg_dist(u, v, hx, hy, 0.86, 0.84)
+    if handle <= 0.042: return (*WHITE, 255)
+    if R - RING <= d <= R: return (*WHITE, 255)
+    if d < R - RING:                                       # inside the lens: a big green window
+        return (*GREEN, 255) if abs(u - MX) <= 0.06 and abs(v - MY) <= 0.06 else (*lerp(bg, WHITE, 0.25), 255)
+    if d <= R + 0.03 or handle <= 0.072: return (*bg, 255)  # gap around the glass
+
+    # building with a pediment and a 3 x 3 grid of windows
+    if 0.16 <= u <= 0.70 and 0.30 <= v <= 0.80:
+        for i in range(3):
+            for j in range(3):
+                wx, wy = 0.22 + i * 0.165, 0.38 + j * 0.13
+                if wx <= u <= wx + 0.10 and wy <= v <= wy + 0.08: return (*INK, 255)
+        return (*WHITE, 255)
+    if 0.30 > v >= 0.16 and abs(u - 0.43) <= 0.31 * (v - 0.16) / 0.14: return (*WHITE, 255)  # roof
+    if 0.11 <= u <= 0.75 and 0.80 <= v <= 0.85: return (*WHITE, 255)  # ground line
     return (*bg, 255)
 
 def render(size, maskable=False, ss=3):
