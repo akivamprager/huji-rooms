@@ -1,7 +1,7 @@
 // Offline support. Network first (so a new version or new data shows up right away when online),
 // falling back to the saved copy when offline or when the network is too slow.
-const CACHE = 'huji-rooms-v11';
-const SHELL = ['./', 'index.html', 'app.js', 'core.js', 'combo.js', 'style.css', 'buildings.json', 'data.json', 'paths.json',
+const CACHE = 'huji-rooms-v14';
+const SHELL = ['./', 'index.html', 'app.js', 'core.js', 'combo.js', 'style.css', 'campuses.js', 'data/gr.json', 'data/scopus.json', 'buildings/gr.json', 'buildings/scopus.json', 'paths/gr.json', 'paths/scopus.json',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/favicon-64.png', 'fonts/heebo-hebrew.woff2', 'fonts/heebo-latin.woff2'];
 const TIMEOUT = 4000; // weak campus Wi-Fi: after this, answer from the cache and update in the background
 
@@ -21,13 +21,18 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
-  e.respondWith(networkFirst(req, e));
+  // Only the app's own page is the app shell; other pages (README, demo/…) load normally and are
+  // never saved in its place.
+  const scope = new URL(self.registration.scope);
+  const isApp = url.pathname === scope.pathname || url.pathname === `${scope.pathname}index.html`;
+  if (req.mode === 'navigate' && !isApp) return;
+  e.respondWith(networkFirst(req, e, isApp));
 });
 
-async function networkFirst(req, e) {
+async function networkFirst(req, e, isApp) {
   const cache = await caches.open(CACHE);
-  const key = req.mode === 'navigate' ? './' : req; // any page load → the app shell
-  const net = fetch(req, { cache: 'no-cache' }).then((res) => {
+  const key = isApp && req.mode === 'navigate' ? './' : req; // the app page, with or without #… / ?…
+  const net = fetch(req.mode === 'navigate' ? req.url : req, { cache: 'no-cache' }).then((res) => {
     if (res.ok) cache.put(key, res.clone());
     return res;
   });

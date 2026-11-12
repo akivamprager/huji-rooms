@@ -114,7 +114,7 @@ export function nearestFree(db, locs, here, { day, minute, limit = 8, perBuildin
     .slice(0, limit);
 }
 
-// ---- walking routes on the campus path network (paths.json, see tools/paths.mjs) ----
+// ---- walking routes on the campus's pedestrian paths (paths/<campus>.json, see tools/paths.mjs) ----
 export function decodePaths(p) {
   const count = p.n.length / 2;
   const lat = new Float64Array(count);
@@ -127,32 +127,49 @@ export function decodePaths(p) {
     adj[a].push(b, p.w[k]);
     adj[b].push(a, p.w[k]);
   }
-  return { lat, lon, adj, edges: p.e, w: p.w, b: p.b };
+  return { lat, lon, adj, edges: p.e, w: p.w, b: p.b, o: p.o || {} };
 }
 
-// Walking metres from `here` to every building on the network (shortest path, like a maps app),
-// or null if `here` is too far from any campus path to route from. The map doesn't draw a path
-// across every lawn, plaza or building entrance, so short stretches off the paths are allowed:
-// from `here` to any path point within OFF_PATH metres, and into a building from any path point
-// listed for it (within 70 m, see tools/paths.mjs); off-path metres cost OFF_PATH_COST times more.
-const OFF_PATH = 80;
-const OFF_PATH_COST = 1.2;
+// Metres from `p` to the outline of a building made of `rings` ([[lat, lon], ...]); 0 if inside.
+export function toOutline(p, rings) {
+  const ky = 110540;
+  const kx = 111320 * Math.cos((p[0] * Math.PI) / 180);
+  let inside = false;
+  let best = Infinity;
+  for (const ring of rings) {
+    for (let k = 0, j = ring.length - 1; k < ring.length; j = k++) {
+      const ay = (ring[j][0] - p[0]) * ky; const ax = (ring[j][1] - p[1]) * kx;
+      const by = (ring[k][0] - p[0]) * ky; const bx = (ring[k][1] - p[1]) * kx;
+      if ((ay > 0) !== (by > 0) && ax + ((0 - ay) * (bx - ax)) / (by - ay) > 0) inside = !inside;
+      const dx = bx - ax; const dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+      best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
+    }
+  }
+  return inside ? 0 : best;
+}
+
+// Walking metres from `here` to every building (shortest path, like a maps app), or null if `here`
+// is too far from any campus path to route from.
 export function walkingDistances(g, here, opts = {}) {
   const tree = walkingTree(g, here, opts);
   return tree && tree.toBuildings;
 }
 
-// The full shortest-path tree from `here`: { dist, prev (previous node, -1 = start), toBuildings,
-// entry: { buildingCode: node the route enters the building from, -1 = walk straight there } } —
-// routeTo() reads a route off it. locs ({ code: [lat, lon] }): a building within OFF_PATH metres can
-// also be walked to directly (you're standing in or right next to it; its paths may be far outside).
+// Routes use ONLY the pedestrian paths: from `here` straight to the nearest point of a path, along
+// the paths, and into a building from a path point next to its outline. The one exception: if you're
+// in a building or within NEXT_TO metres of its outline, you just walk in.
+// Returns { dist, prev (previous node, -1 = start), toBuildings,
+//           entry: { buildingCode: node the route enters the building from, -1 = walk straight in } }.
+// locs ({ code: [lat, lon] }) stands in for outlines a building doesn't have.
+const NEXT_TO = 20;
 export function walkingTree(g, here, { maxSnap = 400, locs = null } = {}) {
-  // local flat coordinates in metres around `here`
   const ky = 110540;
   const kx = 111320 * Math.cos((here[0] * Math.PI) / 180);
   const X = (i) => (g.lon[i] - here[1]) * kx;
   const Y = (i) => (g.lat[i] - here[0]) * ky;
-  // snap to the closest point on any path segment
+  // the closest point on any path segment
   let best = null;
   for (let k = 0; k < g.w.length; k++) {
     const a = g.edges[2 * k];
@@ -161,8 +178,7 @@ export function walkingTree(g, here, { maxSnap = 400, locs = null } = {}) {
     const dx = bx - ax; const dy = by - ay;
     const len2 = dx * dx + dy * dy;
     const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
-    const px = ax + t * dx; const py = ay + t * dy;
-    const d = Math.hypot(px, py);
+    const d = Math.hypot(ax + t * dx, ay + t * dy);
     if (!best || d < best.d) best = { d, a, b, t, k };
   }
   if (!best || best.d > maxSnap) return null;
@@ -202,10 +218,6 @@ export function walkingTree(g, here, { maxSnap = 400, locs = null } = {}) {
   const segLen = g.w[best.k];
   push(best.a, best.d + segLen * best.t);
   push(best.b, best.d + segLen * (1 - best.t));
-  for (let i = 0; i < g.lat.length; i++) {
-    const d = Math.hypot(X(i), Y(i));
-    if (d <= OFF_PATH) push(i, d * OFF_PATH_COST);
-  }
   while (heap.length) {
     const [d, node] = pop();
     if (d > dist[node]) continue;
@@ -214,20 +226,22 @@ export function walkingTree(g, here, { maxSnap = 400, locs = null } = {}) {
   }
   const toBuildings = {};
   const entry = {};
-  for (const [code, list] of Object.entries(g.b)) {
+  const codes = new Set([...Object.keys(g.b), ...Object.keys(locs || {})]);
+  for (const code of codes) {
     let m = Infinity;
+    const list = g.b[code] || [];
     for (let i = 0; i < list.length; i += 2) {
-      const v = dist[list[i]] + list[i + 1] * OFF_PATH_COST;
+      const v = dist[list[i]] + list[i + 1];
       if (v < m) { m = v; entry[code] = list[i]; }
     }
-    const straight = locs?.[code] ? distance(here, locs[code]) : Infinity;
-    if (straight <= OFF_PATH && straight * OFF_PATH_COST < m) { m = straight * OFF_PATH_COST; entry[code] = -1; }
+    const next = g.o[code] ? toOutline(here, g.o[code]) : locs?.[code] ? Math.max(0, distance(here, locs[code]) - 10) : Infinity;
+    if (next <= NEXT_TO && next < m) { m = next; entry[code] = -1; }
     if (m < Infinity) toBuildings[code] = m;
   }
   return { dist, prev, toBuildings, entry };
 }
 
-// The route to a building as [lat, lon] points, from `here` to the building's path entry point.
+// The route to a building as [lat, lon] points, from `here` to where it enters the building.
 export function routeTo(g, tree, here, code) {
   const pts = [];
   for (let n = tree.entry[code] ?? -1; n >= 0; n = tree.prev[n]) pts.push([g.lat[n], g.lon[n]]);

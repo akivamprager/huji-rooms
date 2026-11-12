@@ -113,13 +113,19 @@ test('walkingDistances follows the paths, not a straight line', () => {
 });
 
 test('standing in a building whose paths are outside: walk straight in, not out and back', () => {
-  // path runs 60 m east of the building centre; we stand 3 m from the centre
+  // a 40 m × 40 m building centred on o; its path runs 60 m east of the centre
   const o = [31.77, 35.19];
-  const e60 = 60 / (111320 * Math.cos((o[0] * Math.PI) / 180)) * 1e5;
-  const n100 = 100 / 110540 * 1e5;
-  const g = decodePaths({ origin: o, n: [0, Math.round(e60), Math.round(n100), Math.round(e60)], e: [0, 1], w: [100], b: { 7: [0, 60] } });
-  const here = [o[0] + 3 / 110540, o[1]];
-  assert.ok(walkingDistances(g, here)[7] > 100); // without the building's location: out to the path and back
-  const d = walkingDistances(g, here, { locs: { 7: o } })[7];
-  assert.ok(d < 5, String(d)); // with it: 3 m × 1.2
+  const kx = 111320 * Math.cos((o[0] * Math.PI) / 180);
+  const m2lat = (m) => m / 110540;
+  const m2lon = (m) => m / kx;
+  const e60 = m2lon(60) * 1e5;
+  const n100 = m2lat(100) * 1e5;
+  const ring = [[o[0] - m2lat(20), o[1] - m2lon(20)], [o[0] - m2lat(20), o[1] + m2lon(20)], [o[0] + m2lat(20), o[1] + m2lon(20)], [o[0] + m2lat(20), o[1] - m2lon(20)]];
+  const g = decodePaths({ origin: o, n: [0, Math.round(e60), Math.round(n100), Math.round(e60)], e: [0, 1], w: [100], b: { 7: [0, 40] }, o: { 7: [ring] } });
+  const inside = [o[0] + m2lat(3), o[1]];
+  assert.equal(walkingDistances(g, inside)[7], 0); // in the building
+  const outside = [o[0], o[1] - m2lon(30)]; // 10 m west of the wall, the path is far east
+  assert.ok(Math.abs(walkingDistances(g, outside)[7] - 10) < 1);
+  const far = [o[0], o[1] - m2lon(70)]; // 50 m from the wall: must use the path (no shortcut)
+  assert.ok(walkingDistances(g, far)[7] > 100);
 });

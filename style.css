@@ -294,3 +294,17 @@ button.book-btn { cursor: pointer; font: inherit; font-weight: 600; font-size: .
 .spin { animation: bob 1s ease-in-out infinite; }
 @keyframes bob { 50% { transform: translateY(-6px); } }
 @media (max-width: 720px) { .hero-actions .seg { flex: 1 1 100%; } .near-btn { height: 40px; } }
+.acc-line { margin: 0 2px 10px; font-size: .82rem; color: var(--muted); }
+.card.warn { border-color: #f0b10f; background: color-mix(in srgb, #f0b10f 10%, var(--card)); }
+.card.warn p { margin: 6px 0 10px; font-size: .9rem; color: var(--text); }
+
+/* campus toggle (top of the header) */
+.campus-switch {
+  display: inline-flex; padding: 3px; gap: 2px; margin-bottom: 10px; border-radius: 999px;
+  background: rgb(255 255 255 / .14); border: 1px solid rgb(255 255 255 / .22);
+}
+.campus-switch button {
+  border: 0; background: none; color: #fff; font: inherit; font-size: .88rem; font-weight: 600;
+  padding: 5px 14px; border-radius: 999px; cursor: pointer; opacity: .8;
+}
+.campus-switch button[aria-pressed="true"] { background: #fff; color: #1e2a6e; opacity: 1; }

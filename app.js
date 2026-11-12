@@ -1,5 +1,6 @@
-import { decode, statusAt, freeRooms, eventsOn, dayOf, dateOf, weekday, hm, GAP, nearestFree, walkMinutes, decodePaths, walkingDistances } from './core.js';
+import { decode, statusAt, freeRooms, eventsOn, dayOf, dateOf, weekday, hm, GAP, nearestFree, walkMinutes, decodePaths, walkingDistances, distance } from './core.js';
 import { combo } from './combo.js';
+import { CAMPUSES, DEFAULT_CAMPUS, campusById } from './campuses.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -7,15 +8,16 @@ const DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 
 const DAYS_SHORT = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳'];
 const FROM = 8 * 60;
 const TO = 21 * 60;
-const LS = 'huji-rooms.last';
+const LS_CAMPUS = 'huji-rooms.campus';
+const lastRoomKey = () => `huji-rooms.last.${state.campus}`; // the last room, per campus
 const LS_FAV = 'huji-rooms.favorites';
 const BOOKING = 'https://www.huji.ac.il/rooms/';
 const LTR = (s) => `⁦${s}⁩`;
 
 let db;
-let extras = {}; // building code → { aliases: [...] } (buildings.json, optional)
-// near: null | 'locating' | { here: [lat, lon] } | { error } — the location is never put in the URL or saved
-const state = { tab: 'room', building: null, room: null, week: null, dayIdx: null, freeBuilding: null, day: null, minute: null, near: null };
+let extras = {}; // building code → { aliases, loc } (buildings/<campus>.json, optional)
+// near: null | { locating, acc } | { here: [lat, lon], acc, walk } | { error } — never put in the URL or saved
+const state = { campus: DEFAULT_CAMPUS, tab: 'room', building: null, room: null, week: null, dayIdx: null, freeBuilding: null, day: null, minute: null, near: null };
 
 const nowDay = () => dayOf(new Date());
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
@@ -65,7 +67,7 @@ const buildingOptions = (withAll) => (q) => {
   const opts = list.map((b) => ({
     value: b.code, label: b.name, sub: [aliases(b.code)[0], `${count(b.code)} חדרים`].filter(Boolean).join(' · '), group: isFav('buildings', b.code) ? '★ מועדפים' : 'כל הבניינים',
   }));
-  return withAll && !q.trim() ? [{ value: '', label: 'כל גבעת רם', sub: `${db.rooms.size} חדרים` }, ...opts] : opts;
+  return withAll && !q.trim() ? [{ value: '', label: `כל ${campusById(state.campus).name}`, sub: `${db.rooms.size} חדרים` }, ...opts] : opts;
 };
 const roomOptions = (q) => {
   const day = nowDay();
@@ -94,11 +96,12 @@ function readHash({ start = false } = {}) {
   // Opening the app plainly (no link to a room or search) with a favorite building:
   // go straight to the rooms free right now in that building (the first one, if several).
   const favB = fav.buildings.find((c) => bName(c));
-  if (start && !p.toString() && favB) {
+  const plain = [...p.keys()].every((k) => k === 'c');
+  if (start && plain && favB) {
     Object.assign(state, { tab: 'free', freeBuilding: favB, day: null, minute: null });
   } else if (p.has('near')) {
     Object.assign(state, { tab: 'free', day: null, minute: null });
-    if (!state.near?.here) locate();
+    if (!state.near?.here && !state.near?.locating) locate();
   } else if (p.has('free')) {
     state.tab = 'free';
     state.freeBuilding = bName(p.get('free')) ? p.get('free') : null;
@@ -106,7 +109,7 @@ function readHash({ start = false } = {}) {
     state.minute = p.has('t') ? Number(p.get('t')) : null;
   } else {
     state.tab = 'room';
-    state.room = p.get('room') || (p.toString() ? null : localStorage.getItem(LS));
+    state.room = p.get('room') || (plain ? localStorage.getItem(lastRoomKey()) : null);
     if (state.room && !db.rooms.has(state.room)) state.room = null;
     state.building = state.room ? db.rooms.get(state.room).building : bName(p.get('b')) ? p.get('b') : null;
     state.week = p.has('w') ? Number(p.get('w')) : null;
@@ -114,6 +117,7 @@ function readHash({ start = false } = {}) {
 }
 function writeHash() {
   const p = new URLSearchParams();
+  p.set('c', state.campus);
   if (state.tab === 'free' && state.near) p.set('near', '');
   else if (state.tab === 'free') {
     p.set('free', state.freeBuilding || '');
@@ -123,8 +127,7 @@ function writeHash() {
     p.set('room', state.room);
     if (state.week != null) p.set('w', state.week);
   } else if (state.building) p.set('b', state.building);
-  const h = p.toString();
-  history.replaceState(null, '', h ? `#${h}` : location.pathname + location.search);
+  history.replaceState(null, '', `#${p}`);
 }
 
 // ---- header subtitle ----
@@ -137,6 +140,10 @@ function renderHero() {
 
 function render() {
   writeHash();
+  const campus = campusById(state.campus);
+  $('campus-title').textContent = campus.name;
+  document.title = `חדרים פנויים ב${campus.name}`;
+  document.querySelectorAll('[data-campus]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.campus === state.campus));
   document.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected', b.dataset.tab === state.tab));
   $('tab-room').hidden = state.tab !== 'room';
   $('tab-free').hidden = state.tab !== 'free';
@@ -219,7 +226,7 @@ function renderRoom() {
     if (state.building) availability($('room-overview'), state.building, nowDay(), nowMin(), { when: ' עכשיו' });
     return;
   }
-  localStorage.setItem(LS, room.id);
+  localStorage.setItem(lastRoomKey(), room.id);
 
   const st = statusCard(room);
   $('status').className = `card status ${st.cls}`;
@@ -266,7 +273,7 @@ function renderRoom() {
 function renderFree() {
   const day = state.day ?? nowDay();
   const minute = state.minute ?? nowMin();
-  freeBuildingBox.set(state.freeBuilding ?? '', state.freeBuilding ? bName(state.freeBuilding) : 'כל גבעת רם');
+  freeBuildingBox.set(state.freeBuilding ?? '', state.freeBuilding ? bName(state.freeBuilding) : `כל ${campusById(state.campus).name}`);
   $('free-date').value = isoOf(day);
   $('free-time').value = hm(minute);
   $('free-favs').innerHTML = favChips(true);
@@ -278,42 +285,80 @@ function renderFree() {
 }
 
 // ---- closest free room ----
-// campus walking network (paths.json), loaded the first time it's needed
-let paths = null;
-const loadPaths = () => (paths ||= fetch('paths.json').then((r) => (r.ok ? r.json() : null)).then((p) => p && decodePaths(p)).catch(() => null));
+// campus walking networks (paths/<campus>.json), each loaded the first time it's needed
+const pathsByCampus = {};
+const loadPaths = (id = state.campus) => (pathsByCampus[id] ||= fetch(`paths/${id}.json`).then((r) => (r.ok ? r.json() : null)).then((p) => p && decodePaths(p)).catch(() => null));
+const buildingLocs = () => Object.fromEntries(Object.entries(extras).filter(([, v]) => v.loc).map(([k, v]) => [k, v.loc]));
 
+// Phones often answer first with a rough position (Wi-Fi / cell, or "approximate location" only):
+// keep listening for up to LOCATE_MS and stop early once it's accurate to GOOD_ACCURACY metres.
+const LOCATE_MS = 12000;
+const GOOD_ACCURACY = 40;
+const POOR_ACCURACY = 250;
+let locateRun = 0;
 function locate() {
   loadPaths();
   if (!navigator.geolocation) { state.near = { error: 'הדפדפן הזה לא תומך במיקום.' }; render(); return; }
-  state.near = 'locating';
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      const here = [pos.coords.latitude, pos.coords.longitude];
-      const g = await loadPaths();
-      const locs = Object.fromEntries(Object.entries(extras).filter(([, v]) => v.loc).map(([k, v]) => [k, v.loc]));
-      state.near = { here, walk: g ? walkingDistances(g, here, { locs }) : null };
-      render();
+  const run = ++locateRun;
+  state.near = { locating: true };
+  let best = null;
+  let watch = null;
+  let timer = null;
+  const finish = async () => {
+    if (run !== locateRun) return;
+    navigator.geolocation.clearWatch(watch);
+    clearTimeout(timer);
+    if (!best) return;
+    const here = [best.latitude, best.longitude];
+    // standing on the other campus? switch to it (a rough reading is no reason to switch)
+    const nearestCampus = CAMPUSES.reduce((a, c) => (distance(here, c.center) < distance(here, a.center) ? c : a));
+    if (nearestCampus.id !== state.campus && distance(here, nearestCampus.center) < 1500 && best.accuracy <= POOR_ACCURACY) {
+      await switchCampus(nearestCampus.id, { keepNear: true });
+    }
+    const g = await loadPaths();
+    const locs = buildingLocs();
+    if (run !== locateRun) return;
+    state.near = { here, acc: best.accuracy, walk: g ? walkingDistances(g, here, { locs }) : null };
+    render();
+  };
+  watch = navigator.geolocation.watchPosition(
+    (pos) => {
+      if (!best || pos.coords.accuracy < best.accuracy) best = pos.coords;
+      if (best.accuracy <= GOOD_ACCURACY) { finish(); return; }
+      if (state.near?.locating) { state.near = { locating: true, acc: best.accuracy }; render(); }
     },
     (err) => {
+      if (run !== locateRun || best) return; // keep the best reading so far
+      navigator.geolocation.clearWatch(watch);
+      clearTimeout(timer);
       state.near = { error: err.code === 1
         ? 'אין הרשאה למיקום. אפשר לאשר אותה בהגדרות הדפדפן לאתר הזה ולנסות שוב.'
         : 'לא הצלחתי לקבל מיקום. נסו שוב בעוד רגע.' };
       render();
     },
-    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+    { enableHighAccuracy: true, timeout: LOCATE_MS, maximumAge: 0 },
   );
+  timer = setTimeout(() => {
+    if (best) finish();
+    else if (run === locateRun) { navigator.geolocation.clearWatch(watch); state.near = { error: 'לא הצלחתי לקבל מיקום. נסו שוב בעוד רגע, רצוי ליד חלון או בחוץ.' }; render(); }
+  }, LOCATE_MS);
 }
+
+const accText = (m) => (m >= 1000 ? `${(m / 1000).toFixed(1)} ק״מ` : `${Math.round(m)} מ׳`);
 
 function nearResults(el, day, minute) {
   const head = (extra = '') => `<div class="near-head"><h2 class="section-title">📍 הכי קרובים אליך${extra}</h2>
     <button class="pill-btn" data-near-off="1">✕ חזרה לחיפוש לפי בניין</button></div>`;
-  if (state.near === 'locating') { el.innerHTML = `${head()}<div class="empty"><div class="empty-icon spin" aria-hidden="true">📍</div><p>מאתר את המיקום שלך…</p></div>`; return; }
+  if (state.near.locating) {
+    el.innerHTML = `${head()}<div class="empty"><div class="empty-icon spin" aria-hidden="true">📍</div><p>מאתר את המיקום שלך…${state.near.acc ? `<br><small>דיוק כרגע: ±${accText(state.near.acc)}</small>` : ''}</p></div>`;
+    return;
+  }
   if (state.near.error) {
     el.innerHTML = `${head()}<div class="empty"><div class="empty-icon" aria-hidden="true">🧭</div><p>${esc(state.near.error)}</p><button class="pill-btn" data-near="1">לנסות שוב</button></div>`;
     return;
   }
   if (!inData(day)) { availability(el, null, day, minute); return; }
-  const locs = Object.fromEntries(Object.entries(extras).filter(([, v]) => v.loc).map(([k, v]) => [k, v.loc]));
+  const locs = buildingLocs();
   const routed = !!state.near.walk;
   const list = nearestFree(db, locs, state.near.here, { day, minute, limit: 9, walk: state.near.walk });
   const far = list.length && list[0].dist > 2000;
@@ -324,10 +369,15 @@ function nearResults(el, day, minute) {
       <span class="rc-walk">🚶 ${far ? `${(dist / 1000).toFixed(1)} ק״מ` : dist < 30 ? 'ממש לידך' : `${walkMinutes(dist)} דק׳ הליכה · ${LTR(`${Math.round(dist / 10) * 10}`)} מ׳`}</span>
       <span class="rc-until free">${until == null ? 'פנוי עד סוף היום' : `פנוי עד ${LTR(hm(until))} · ${dur(left)}`}</span></button>`;
   }).join('');
+  const poor = state.near.acc > POOR_ACCURACY;
   el.innerHTML = `${head(` <span class="count">${list.length}</span>`)}
-    ${!routed ? `<p class="book-note">${far ? 'נראה שאתם מחוץ לקמפוס — ' : ''}המרחקים משוערים לפי קו אווירי, כי לא נמצא שביל הליכה קרוב למיקום שלכם.</p>` : ''}
+    <p class="acc-line">📡 דיוק המיקום: ±${accText(state.near.acc)}</p>
+    ${poor ? `<div class="card warn"><b>המיקום שהתקבל לא מדויק (±${accText(state.near.acc)}), אז התוצאות כנראה לא נכונות.</b>
+      <p>לרוב זה כי לאתר מאושר רק <b>מיקום משוער</b>. באנדרואיד: הגדרות ← אפליקציות ← Chrome ← הרשאות ← מיקום ← להפעיל <b>"שימוש במיקום מדויק"</b>, ובאתר עצמו (סמל המנעול ליד הכתובת) ← הרשאות ← מיקום. בתוך בניין עוזר גם להתקרב לחלון.</p>
+      <button class="pill-btn" data-near="1">לנסות שוב</button></div>` : ''}
+    ${!routed && !poor ? `<p class="book-note">${far ? 'נראה שאתם מחוץ לקמפוס — ' : ''}המרחקים משוערים לפי קו אווירי, כי לא נמצא שביל הליכה קרוב למיקום שלכם.</p>` : ''}
     <div class="room-grid">${cards || '<p class="muted">אין כרגע חדר פנוי בבניינים שהמיקום שלהם ידוע.</p>'}</div>
-    <p class="book-note">🔒 המיקום לא נשלח לשום מקום ולא נשמר — המסלולים מחושבים במכשיר שלך. מפת השבילים: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>.</p>`;
+    <p class="book-note">🔒 המיקום לא נשלח לשום מקום ולא נשמר — המסלולים מחושבים במכשיר שלך. מסלולים לפי השבילים והדרכים במפת הקמפוס של האוניברסיטה.</p>`;
 }
 
 // Free rooms (longest free first, "until when") and busy ones (when they free up) → el.
@@ -360,8 +410,9 @@ function availability(el, building, day, minute, { when = '' } = {}) {
 document.addEventListener('click', (e) => {
   const t = e.target.closest('button');
   if (!t || t.closest('.combo')) return;
-  if (t.dataset.near) { state.tab = 'free'; state.day = null; state.minute = null; locate(); render(); scrollTo({ top: 0, behavior: 'smooth' }); }
-  else if (t.dataset.nearOff) { state.near = null; render(); }
+  if (t.dataset.campus) { if (t.dataset.campus !== state.campus) switchCampus(t.dataset.campus); }
+  else if (t.dataset.near) { state.tab = 'free'; state.day = null; state.minute = null; locate(); render(); scrollTo({ top: 0, behavior: 'smooth' }); }
+  else if (t.dataset.nearOff) { state.near = null; locateRun++; render(); }
   else if (t.dataset.tab) { state.tab = t.dataset.tab; render(); }
   else if (t.dataset.fav) { toggleFav(t.dataset.fav, t.dataset.id); render(); }
   else if (t.dataset.building) {
@@ -392,7 +443,11 @@ $('free-time').addEventListener('change', (e) => {
   const [h, m] = e.target.value.split(':').map(Number);
   if (!Number.isNaN(h)) { state.minute = h * 60 + (m || 0); render(); }
 });
-addEventListener('hashchange', () => { readHash(); render(); });
+addEventListener('hashchange', async () => {
+  const c = new URLSearchParams(location.hash.slice(1)).get('c');
+  if (c && c !== state.campus && CAMPUSES.some((x) => x.id === c)) await switchCampus(c, { fromHash: true });
+  readHash(); render();
+});
 // keep "now" current while the page stays open (not while a dropdown is in use)
 setInterval(() => { if (!document.hidden && !document.activeElement?.closest('.combo')) render(); }, 60_000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && db) render(); });
@@ -418,15 +473,41 @@ $('install-btn').addEventListener('click', async () => {
   $('install-btn').hidden = true;
 });
 
-// ---- start ----
-try {
-  const [res, ph] = await Promise.all([
-    fetch('data.json', { cache: 'no-cache' }),
-    fetch('buildings.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
+// ---- campuses ----
+// Load a campus's data (data/<id>.json) and building extras (buildings/<id>.json).
+async function loadCampus(id) {
+  const [res, ex] = await Promise.all([
+    fetch(`data/${id}.json`, { cache: 'no-cache' }),
+    fetch(`buildings/${id}.json`, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
   ]);
   if (!res.ok) throw new Error(res.status);
-  db = decode(await res.json());
-  extras = ph;
+  return { db: decode(await res.json()), extras: ex };
+}
+function applyCampus(id, loaded) {
+  state.campus = id;
+  db = loaded.db;
+  extras = loaded.extras;
+  localStorage.setItem(LS_CAMPUS, id);
+  $('built').textContent = db.builtAt ? `עודכן ${new Date(db.builtAt).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}` : '';
+}
+async function switchCampus(id, { keepNear = false, fromHash = false } = {}) {
+  let loaded;
+  try { loaded = await loadCampus(id); } catch (err) { alert(`לא הצלחתי לטעון את ${campusById(id).name} (${err.message}).`); return; }
+  applyCampus(id, loaded);
+  Object.assign(state, { building: null, room: null, week: null, dayIdx: null, freeBuilding: null });
+  if (!keepNear) { state.near = null; locateRun++; }
+  if (!fromHash) {
+    // like opening the app: the last room on this campus, or a favorite building's free rooms
+    if (!keepNear) { history.replaceState(null, '', `#c=${id}`); readHash({ start: true }); }
+    render();
+  }
+}
+
+// ---- start ----
+try {
+  const hashCampus = new URLSearchParams(location.hash.slice(1)).get('c');
+  const first = [hashCampus, localStorage.getItem(LS_CAMPUS), DEFAULT_CAMPUS].find((c) => c && CAMPUSES.some((x) => x.id === c));
+  applyCampus(first, await loadCampus(first));
   roomBuildingBox = combo($('room-building'), {
     placeholder: 'כל הבניינים — הקלידו לחיפוש',
     options: buildingOptions(false),
@@ -442,16 +523,15 @@ try {
     onSelect: (v) => {
       state.room = v; state.week = null; state.dayIdx = null;
       if (v) state.building = db.rooms.get(v).building;
-      else localStorage.removeItem(LS);
+      else localStorage.removeItem(lastRoomKey());
       render();
     },
   });
   freeBuildingBox = combo($('free-building'), {
-    placeholder: 'כל גבעת רם',
+    placeholder: 'כל הקמפוס',
     options: buildingOptions(true),
     onSelect: (v) => { state.freeBuilding = v || null; state.near = null; render(); },
   });
-  if (db.builtAt) $('built').textContent = `עודכן ${new Date(db.builtAt).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}`;
   $('loading').remove();
   readHash({ start: true });
   render();

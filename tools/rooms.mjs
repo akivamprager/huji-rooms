@@ -1,5 +1,6 @@
-// Builds data.json for index.html: every Shnaton meeting held in a Givat Ram room, by room and
-// date. Runs nightly from .github/workflows/data.yml (and by hand: node tools/rooms.mjs).
+// Builds data/<campus>.json for index.html: every Shnaton meeting held in a room on each campus in
+// campuses.js, by room and date. Runs nightly from .github/workflows/data.yml (and by hand:
+// node tools/rooms.mjs).
 // The Shnaton API has no CORS, so the page can't ask it directly — it reads this file.
 //
 //   1. POST /courses/search-advanced (one call per period) → every course of the year
@@ -12,9 +13,10 @@
 //     rooms: { id: [name, buildingCode] },
 //     s: { roomId: [[courseCode, group, typeIndex, start, end, firstDay, Δday, Δday, …]] } }
 // No teacher names or emails are kept.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { CAMPUSES } from '../campuses.js';
 const SHNATON_API = 'https://shnaton.huji.ac.il/api';
-// Givat Ram is listed in the Shnaton as campus 1, "אדמונד י' ספרא"
+// Givat Ram is listed in the Shnaton as campus 1, "אדמונד י' ספרא"; Mount Scopus as campus 0
 export const CAMPUS = { code: '1', name: 'גבעת רם' };
 // Shnaton periods: 1 = A, 2 = B, 3 = A or B, 4 = summer, 5 = year-long
 const PERIODS = [1, 2, 3, 4, 5];
@@ -49,6 +51,7 @@ export function buildRooms(courses, groupsByCourse, { year, campus = CAMPUS } = 
 
   const useRoom = (room) => {
     if (!room?.id) { stats.noRoom++; return null; }
+    if (/^\s*(מקוון|zoom|online)\s*$/i.test(room.name?.he || '')) { stats.online++; return null; } // pseudo-rooms
     if (String(room.building?.campus?.code) !== campus.code) { stats.otherCampus++; return null; }
     const b = room.building;
     buildings[b.code] = b.name?.he?.trim() || b.code;
@@ -97,7 +100,7 @@ export function buildRooms(courses, groupsByCourse, { year, campus = CAMPUS } = 
 
 // The Shnaton files some rooms under a building called "לא מוגדר" (undefined). Move each to the real
 // building named in the room's name ("בנין ברגמן" → ברגמן), else to "אחר" (other).
-const UNDEFINED = /^(לא מוגדר|undefined)?$/i;
+const UNDEFINED = /^(לא מוגדר.*|undefined)?$/i; // also "לא מוגדר (ה.צ.)" on Mount Scopus
 const bare = (s) => s.replace(/ב[י]?נין|ב[י]?ניין|אולם|["'״׳]/g, '').replace(/\s+/g, ' ').trim();
 export function fixUndefinedBuildings(data) {
   const bad = Object.keys(data.buildings).filter((c) => UNDEFINED.test(data.buildings[c].trim()));
@@ -166,25 +169,27 @@ async function main() {
   console.log(`${courses.size} courses in ${chunks.length} requests, ${failed} failed`);
   if (failed > chunks.length * 0.05) throw new Error('too many failed requests — keeping the old data');
 
-  const { data, stats } = buildRooms([...courses.values()], groupsByCourse, { year });
+  mkdirSync(new URL('data/', root), { recursive: true });
   const count = (d) => Object.values(d.s).reduce((n, l) => n + l.length, 0);
-  console.log(`sessions ${stats.sessions} (Givat Ram without dates ${stats.noDates}, online ${stats.online}, other campus ${stats.otherCampus}, no room ${stats.noRoom})`);
-  console.log(`${CAMPUS.name}: ${Object.keys(data.buildings).length} buildings, ${Object.keys(data.rooms).length} rooms, ${count(data)} entries`);
-  if (!Object.keys(data.rooms).length) throw new Error(`no rooms on campus ${CAMPUS.code} (${CAMPUS.name}) — did the API change?`);
-
-  const out = new URL('data.json', root);
-  if (existsSync(out)) {
-    const prev = JSON.parse(readFileSync(out, 'utf8'));
-    // a sudden collapse is an API glitch, not a change
-    if (prev.year === year && count(data) < count(prev) / 2 && process.env.FORCE !== 'true') {
-      throw new Error(`only ${count(data)} entries (was ${count(prev)}) — keeping the old data (FORCE=true to override)`);
+  for (const campus of CAMPUSES) {
+    const { data, stats } = buildRooms([...courses.values()], groupsByCourse, { year, campus });
+    console.log(`${campus.name}: sessions ${stats.sessions} (without dates ${stats.noDates}, online ${stats.online}, other campus ${stats.otherCampus}, no room ${stats.noRoom})`);
+    console.log(`${campus.name}: ${Object.keys(data.buildings).length} buildings, ${Object.keys(data.rooms).length} rooms, ${count(data)} entries`);
+    if (!Object.keys(data.rooms).length) throw new Error(`no rooms on campus ${campus.code} (${campus.name}) — did the API change?`);
+    const out = new URL(`data/${campus.id}.json`, root);
+    if (existsSync(out)) {
+      const prev = JSON.parse(readFileSync(out, 'utf8'));
+      // a sudden collapse is an API glitch, not a change
+      if (prev.year === year && count(data) < count(prev) / 2 && process.env.FORCE !== 'true') {
+        throw new Error(`${campus.name}: only ${count(data)} entries (was ${count(prev)}) — keeping the old data (FORCE=true to override)`);
+      }
+      const { builtAt: _a, ...prevRest } = prev;
+      if (JSON.stringify(prevRest) === JSON.stringify(data)) { console.log(`${campus.name}: no change`); continue; }
     }
-    const { builtAt: _a, ...prevRest } = prev;
-    if (JSON.stringify(prevRest) === JSON.stringify(data)) { console.log('no change'); return; }
+    const text = JSON.stringify({ ...data, builtAt: new Date().toISOString() });
+    writeFileSync(out, text);
+    console.log(`wrote data/${campus.id}.json (${Math.round(text.length / 1024)} KB)`);
   }
-  const text = JSON.stringify({ ...data, builtAt: new Date().toISOString() });
-  writeFileSync(out, text);
-  console.log(`wrote data.json (${Math.round(text.length / 1024)} KB)`);
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/^.*\//, ''))) {
