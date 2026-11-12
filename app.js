@@ -88,9 +88,14 @@ let roomBox;
 let freeBuildingBox;
 
 // ---- state ↔ URL hash (so a room or a search can be shared) ----
-function readHash() {
+function readHash({ start = false } = {}) {
   const p = new URLSearchParams(location.hash.slice(1));
-  if (p.has('free')) {
+  // Opening the app plainly (no link to a room or search) with a favorite building:
+  // go straight to the rooms free right now in that building (the first one, if several).
+  const favB = fav.buildings.find((c) => bName(c));
+  if (start && !p.toString() && favB) {
+    Object.assign(state, { tab: 'free', freeBuilding: favB, day: null, minute: null });
+  } else if (p.has('free')) {
     state.tab = 'free';
     state.freeBuilding = p.get('free') || null;
     state.day = p.has('d') ? Number(p.get('d')) : null;
@@ -367,7 +372,7 @@ try {
   });
   if (db.builtAt) $('built').textContent = `עודכן ${new Date(db.builtAt).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}`;
   $('loading').remove();
-  readHash();
+  readHash({ start: true });
   render();
 } catch (err) {
   $('loading').textContent = `לא הצלחתי לטעון את הנתונים (${err.message}).`;
