@@ -326,7 +326,15 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && db
 // ---- installable app (PWA) ----
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 let installPrompt = null;
-addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; $('install-btn').hidden = false; });
+// already running as the installed app (Chrome/Edge standalone or window-controls-overlay, iOS home screen)
+const isInstalled = () => matchMedia('(display-mode: standalone), (display-mode: window-controls-overlay), (display-mode: minimal-ui)').matches
+  || navigator.standalone === true;
+addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  if (isInstalled()) return;
+  installPrompt = e;
+  $('install-btn').hidden = false;
+});
 addEventListener('appinstalled', () => { installPrompt = null; $('install-btn').hidden = true; });
 $('install-btn').addEventListener('click', async () => {
   if (!installPrompt) return;

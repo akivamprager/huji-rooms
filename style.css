@@ -262,3 +262,7 @@ bdi { unicode-bidi: isolate; direction: ltr; white-space: nowrap; }
 
 button.book-btn { cursor: pointer; font: inherit; font-weight: 600; font-size: .9rem; }
 @media (max-width: 720px) { button.book-btn { font-size: .8rem; } .hero-side { flex-direction: row; flex-wrap: wrap; } }
+/* never offer installing inside the installed app */
+@media (display-mode: standalone), (display-mode: window-controls-overlay), (display-mode: minimal-ui) {
+  #install-btn { display: none !important; }
+}
