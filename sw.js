@@ -1,6 +1,6 @@
 // Offline support. Network first (so a new version or new data shows up right away when online),
 // falling back to the saved copy when offline or when the network is too slow. Fonts: cache first.
-const CACHE = 'huji-rooms-v4';
+const CACHE = 'huji-rooms-v5';
 const SHELL = ['./', 'index.html', 'app.js', 'core.js', 'combo.js', 'style.css', 'buildings.json', 'data.json',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/favicon-64.png'];
 const TIMEOUT = 4000; // weak campus Wi-Fi: after this, answer from the cache and update in the background

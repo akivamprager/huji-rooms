@@ -97,14 +97,14 @@ function readHash({ start = false } = {}) {
     Object.assign(state, { tab: 'free', freeBuilding: favB, day: null, minute: null });
   } else if (p.has('free')) {
     state.tab = 'free';
-    state.freeBuilding = p.get('free') || null;
+    state.freeBuilding = bName(p.get('free')) ? p.get('free') : null;
     state.day = p.has('d') ? Number(p.get('d')) : null;
     state.minute = p.has('t') ? Number(p.get('t')) : null;
   } else {
     state.tab = 'room';
     state.room = p.get('room') || (p.toString() ? null : localStorage.getItem(LS));
     if (state.room && !db.rooms.has(state.room)) state.room = null;
-    state.building = state.room ? db.rooms.get(state.room).building : p.get('b') || null;
+    state.building = state.room ? db.rooms.get(state.room).building : bName(p.get('b')) ? p.get('b') : null;
     state.week = p.has('w') ? Number(p.get('w')) : null;
   }
 }
@@ -207,9 +207,13 @@ function renderRoom() {
   const room = state.room && db.rooms.get(state.room);
   roomBox.set(room ? room.id : null, room ? room.name : '');
   $('favs').innerHTML = favChips(false);
-  $('room-empty').hidden = !!room;
+  $('room-empty').hidden = !!room || !!state.building;
   $('room-view').hidden = !room;
-  if (!room) return;
+  $('room-overview').hidden = !!room || !state.building;
+  if (!room) {
+    if (state.building) availability($('room-overview'), state.building, nowDay(), nowMin(), { when: ' עכשיו' });
+    return;
+  }
   localStorage.setItem(LS, room.id);
 
   const st = statusCard(room);
@@ -261,12 +265,17 @@ function renderFree() {
   $('free-date').value = isoOf(day);
   $('free-time').value = hm(minute);
   $('free-favs').innerHTML = favChips(true);
+  availability($('free-result'), state.freeBuilding, day, minute);
+}
+
+// Free rooms (longest free first, "until when") and busy ones (when they free up) → el.
+function availability(el, building, day, minute, { when = '' } = {}) {
   if (!inData(day)) {
-    $('free-result').innerHTML = '<div class="empty"><div class="empty-icon" aria-hidden="true">🌴</div><p>אין מפגשים בשנתון בתאריך הזה — כנראה הכול פנוי.</p></div>';
+    el.innerHTML = '<div class="empty"><div class="empty-icon" aria-hidden="true">🌴</div><p>אין מפגשים בשנתון בתאריך הזה — כנראה הכול פנוי.</p></div>';
     return;
   }
-  const { free, busy } = freeRooms(db, { building: state.freeBuilding || null, day, minute });
-  const showB = !state.freeBuilding;
+  const { free, busy } = freeRooms(db, { building: building || null, day, minute });
+  const showB = !building;
   const freeCards = free.map(({ room, until }) => {
     const left = until == null ? TO - minute : until - minute;
     const pct = Math.max(4, Math.min(100, Math.round((left / 240) * 100)));
@@ -277,12 +286,12 @@ function renderFree() {
   }).join('');
   const busyRows = busy.map(({ room, now, until }) => `<li><button class="link" data-goto="${esc(room.id)}">${esc(room.name)}${showB ? ` <small class="muted">${esc(room.buildingName)}</small>` : ''}</button>
     <span class="muted small">${esc(now.map((e) => e.name).join(', '))}</span><span class="tag busy">מתפנה ב-${LTR(hm(until))}</span></li>`).join('');
-  $('free-result').innerHTML = `
-    <h2 class="section-title">פנויים <span class="count">${free.length}</span></h2>
+  el.innerHTML = `
+    <h2 class="section-title">פנויים${when} <span class="count">${free.length}</span></h2>
     <div class="room-grid">${freeCards || '<p class="muted">אין חדר פנוי בזמן הזה.</p>'}</div>
     <p class="book-note">צריכים חדר שמור לעבודה בקבוצה? <a href="${BOOKING}" target="_blank" rel="noopener">הזמנת חדר לימוד באתר האוניברסיטה ↗</a></p>
     ${busy.length ? `<details class="card busy-list"><summary>תפוסים <span class="count">${busy.length}</span></summary><ul>${busyRows}</ul></details>` : ''}`;
-  for (const el of $('free-result').querySelectorAll('[data-pct]')) el.style.setProperty('--pct', `${el.dataset.pct}%`);
+  for (const c of el.querySelectorAll('[data-pct]')) c.style.setProperty('--pct', `${c.dataset.pct}%`);
 }
 
 // ---- events ----
@@ -297,7 +306,7 @@ document.addEventListener('click', (e) => {
     render();
   } else if (t.dataset.room) { state.room = t.dataset.room; state.building = db.rooms.get(t.dataset.room).building; state.week = null; state.dayIdx = null; render(); }
   else if (t.dataset.goto) {
-    const day = state.day ?? nowDay();
+    const day = state.tab === 'free' ? state.day ?? nowDay() : nowDay();
     state.tab = 'room'; state.room = t.dataset.goto; state.building = db.rooms.get(t.dataset.goto).building;
     state.week = weekStart(day) === weekStart(nowDay()) ? null : weekStart(day);
     state.dayIdx = Math.min(weekday(day), 5);
@@ -360,7 +369,6 @@ try {
       state.building = v;
       if (state.room && db.rooms.get(state.room).building !== v) state.room = null;
       render();
-      if (v && !state.room) setTimeout(() => roomBox.focus(), 0);
     },
   });
   roomBox = combo($('room-room'), {
