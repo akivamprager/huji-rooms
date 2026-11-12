@@ -1,4 +1,4 @@
-# חדרים בגבעת רם
+# חדרים פנויים בגבעת רם
 
 Pick a room or hall at Givat Ram and see when lectures and recitations occupy it. You can also go the other way: pick a building and a time and see which rooms are free. The data comes from the [Hebrew University Shnaton](https://shnaton.huji.ac.il/).
 
